@@ -1,0 +1,68 @@
+﻿[dotenv@17.2.3] injecting env (7) from .env -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+Connected to MySQL Database
+[
+  {
+    Field: 'id',
+    Type: 'int(11)',
+    Null: 'NO',
+    Key: 'PRI',
+    Default: null,
+    Extra: 'auto_increment'
+  },
+  {
+    Field: 'company_id',
+    Type: 'int(11)',
+    Null: 'NO',
+    Key: 'MUL',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'module_key',
+    Type: 'varchar(50)',
+    Null: 'YES',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'name',
+    Type: 'varchar(255)',
+    Null: 'NO',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'description',
+    Type: 'text',
+    Null: 'YES',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'status',
+    Type: "enum('ACTIVE','INACTIVE')",
+    Null: 'YES',
+    Key: '',
+    Default: 'ACTIVE',
+    Extra: ''
+  },
+  {
+    Field: 'created_at',
+    Type: 'timestamp',
+    Null: 'NO',
+    Key: '',
+    Default: 'current_timestamp()',
+    Extra: ''
+  },
+  {
+    Field: 'updated_at',
+    Type: 'timestamp',
+    Null: 'NO',
+    Key: '',
+    Default: 'current_timestamp()',
+    Extra: 'on update current_timestamp()'
+  }
+]

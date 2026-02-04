@@ -1,0 +1,112 @@
+{
+  "tables": [
+    {
+      "Tables_in_trakio_db": "asset_assignments"
+    },
+    {
+      "Tables_in_trakio_db": "asset_categories"
+    },
+    {
+      "Tables_in_trakio_db": "asset_requests"
+    },
+    {
+      "Tables_in_trakio_db": "assets"
+    },
+    {
+      "Tables_in_trakio_db": "audit_logs"
+    },
+    {
+      "Tables_in_trakio_db": "companies"
+    },
+    {
+      "Tables_in_trakio_db": "company_modules"
+    },
+    {
+      "Tables_in_trakio_db": "departments"
+    },
+    {
+      "Tables_in_trakio_db": "employees"
+    },
+    {
+      "Tables_in_trakio_db": "maintenance_tickets"
+    },
+    {
+      "Tables_in_trakio_db": "modules_master"
+    },
+    {
+      "Tables_in_trakio_db": "users"
+    }
+  ],
+  "columns": [
+    {
+      "Field": "id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": null,
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "company_id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": null,
+      "Extra": ""
+    },
+    {
+      "Field": "module_id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": null,
+      "Extra": ""
+    },
+    {
+      "Field": "allocated",
+      "Type": "tinyint(1)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "1",
+      "Extra": ""
+    },
+    {
+      "Field": "enabled",
+      "Type": "tinyint(1)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    }
+  ],
+  "data": [
+    {
+      "id": 1,
+      "company_id": 1,
+      "module_id": 1,
+      "allocated": 1,
+      "enabled": 1
+    },
+    {
+      "id": 2,
+      "company_id": 1,
+      "module_id": 3,
+      "allocated": 1,
+      "enabled": 1
+    },
+    {
+      "id": 3,
+      "company_id": 1,
+      "module_id": 2,
+      "allocated": 1,
+      "enabled": 1
+    },
+    {
+      "id": 4,
+      "company_id": 2,
+      "module_id": 1,
+      "allocated": 1,
+      "enabled": 1
+    }
+  ]
+}

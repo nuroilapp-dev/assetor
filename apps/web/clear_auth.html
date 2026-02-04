@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Auth Storage</title>
+</head>
+<body>
+    <h1>Clear Authentication Storage</h1>
+    <button onclick="clearStorage()">Clear Storage & Reload</button>
+    <div id="result"></div>
+    
+    <script>
+        function clearStorage() {
+            // Clear localStorage
+            localStorage.clear();
+            
+            // Clear sessionStorage
+            sessionStorage.clear();
+            
+            // Clear IndexedDB (used by AsyncStorage in web)
+            if (window.indexedDB) {
+                indexedDB.databases().then(databases => {
+                    databases.forEach(db => {
+                        indexedDB.deleteDatabase(db.name);
+                    });
+                });
+            }
+            
+            document.getElementById('result').innerHTML = '<p style="color: green;">Storage cleared! Reloading in 2 seconds...</p>';
+            
+            setTimeout(() => {
+                window.location.href = 'http://localhost:8081';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+CREATE TABLE `company_modules` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `company_id` int(11) NOT NULL,
+  `module_id` int(11) NOT NULL,
+  `is_enabled` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `country_id` int(11) DEFAULT NULL,
+  `premises_type_id` int(11) DEFAULT NULL,
+  `area_id` int(11) DEFAULT NULL,
+  `status_id` int(11) DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `module_id` (`module_id`),
+  KEY `idx_country_id` (`country_id`),
+  KEY `idx_premises_type_id` (`premises_type_id`),
+  KEY `idx_area_id` (`area_id`),
+  KEY `idx_status_id` (`status_id`),
+  KEY `idx_company_module_search` (`company_id`,`module_id`),
+  CONSTRAINT `company_modules_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `company_modules_ibfk_2` FOREIGN KEY (`module_id`) REFERENCES `modules_master` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci

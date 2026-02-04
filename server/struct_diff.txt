@@ -1,0 +1,16 @@
+
+--- Table: office_premises ---
+MySQL Columns: address_line1, address_line2, area_id, area_sqft, building_name, capacity, city, company_id, company_module_id, country, created_at, document_mime, document_name, document_path, floors, full_address, google_map_url, landmark, location_lat, location_lng, location_notes, parking_area, parking_available, premise_id, premise_type, premises_name, premises_use, status, updated_at
+PG Columns:    address_line1, address_line2, area_sqft, building_name, capacity, city, company_id, country, created_at, floors, full_address, landmark, location_lat, location_lng, premise_id, premise_type, premises_name, premises_use, status, updated_at
+
+--- Table: modules ---
+MySQL Columns: company_id, created_at, description, id, module_key, name, status, updated_at
+PG Columns:    company_id, created_at, description, id, name, status, updated_at
+
+--- Table: company_module_field_selection ---
+MySQL Columns: company_module_id, created_at, field_id, id
+PG Columns:    company_module_id, field_id, id
+
+--- Table: office_owned_details ---
+MySQL Columns: buy_date, depreciation_percent, depreciation_rate, electricity_available, floors_count, insurance_expiry, insurance_required, internet_available, notes, owner_name, ownership_type, premise_id, property_size_sqft, property_tax_id, purchase_value, renewal_date, renewal_required, title_deed_ref, vendor_name, warranty_end_date, water_available
+PG Columns:    buy_date, depreciation_percent, electricity_available, insurance_expiry, ownership_type, premise_id, property_tax_id, purchase_value, vendor_name, warranty_end_date

@@ -1,0 +1,436 @@
+[
+  {
+    "TABLE_NAME": "assets",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "assets",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "asset_code",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 2
+  },
+  {
+    "TABLE_NAME": "assets",
+    "INDEX_NAME": "category_id",
+    "COLUMN_NAME": "category_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "assets",
+    "INDEX_NAME": "current_holder_id",
+    "COLUMN_NAME": "current_holder_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "assets",
+    "INDEX_NAME": "company_id_2",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "asset_assignments",
+    "INDEX_NAME": "asset_id",
+    "COLUMN_NAME": "asset_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "asset_assignments",
+    "INDEX_NAME": "employee_id",
+    "COLUMN_NAME": "employee_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "asset_assignments",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "asset_categories",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "asset_requests",
+    "INDEX_NAME": "employee_id",
+    "COLUMN_NAME": "employee_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "asset_requests",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "audit_logs",
+    "INDEX_NAME": "user_id",
+    "COLUMN_NAME": "user_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "audit_logs",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "companies",
+    "INDEX_NAME": "subdomain",
+    "COLUMN_NAME": "subdomain",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "module_id",
+    "COLUMN_NAME": "module_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "idx_country_id",
+    "COLUMN_NAME": "country_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "idx_premises_type_id",
+    "COLUMN_NAME": "premises_type_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "idx_area_id",
+    "COLUMN_NAME": "area_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "idx_status_id",
+    "COLUMN_NAME": "status_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "idx_company_module_search",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "idx_company_module_search",
+    "COLUMN_NAME": "module_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 2
+  },
+  {
+    "TABLE_NAME": "company_modules",
+    "INDEX_NAME": "fk_cm_property_type",
+    "COLUMN_NAME": "property_type_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_module_field_selection",
+    "INDEX_NAME": "idx_cm",
+    "COLUMN_NAME": "company_module_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "company_module_field_selection",
+    "INDEX_NAME": "idx_field",
+    "COLUMN_NAME": "field_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "countries",
+    "INDEX_NAME": "uq_country_name",
+    "COLUMN_NAME": "country_name",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "departments",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "employees",
+    "INDEX_NAME": "department_id",
+    "COLUMN_NAME": "department_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "employees",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "maintenance_tickets",
+    "INDEX_NAME": "asset_id",
+    "COLUMN_NAME": "asset_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "maintenance_tickets",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "modules",
+    "INDEX_NAME": "company_id_2",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "modules",
+    "INDEX_NAME": "company_id_2",
+    "COLUMN_NAME": "module_key",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 2
+  },
+  {
+    "TABLE_NAME": "modules",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "modules_master",
+    "INDEX_NAME": "module_key",
+    "COLUMN_NAME": "module_key",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_heads",
+    "INDEX_NAME": "template_id",
+    "COLUMN_NAME": "template_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_sections",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_sections",
+    "INDEX_NAME": "module_id",
+    "COLUMN_NAME": "module_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_section_fields",
+    "INDEX_NAME": "unique_field_key",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_section_fields",
+    "INDEX_NAME": "unique_field_key",
+    "COLUMN_NAME": "section_id",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 2
+  },
+  {
+    "TABLE_NAME": "module_section_fields",
+    "INDEX_NAME": "unique_field_key",
+    "COLUMN_NAME": "field_key",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 3
+  },
+  {
+    "TABLE_NAME": "module_section_fields",
+    "INDEX_NAME": "module_id",
+    "COLUMN_NAME": "module_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_section_fields",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_section_fields",
+    "INDEX_NAME": "section_id",
+    "COLUMN_NAME": "section_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_section_field_options",
+    "INDEX_NAME": "field_id",
+    "COLUMN_NAME": "field_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_subheads",
+    "INDEX_NAME": "head_id",
+    "COLUMN_NAME": "head_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_subhead_options",
+    "INDEX_NAME": "subhead_id",
+    "COLUMN_NAME": "subhead_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_templates",
+    "INDEX_NAME": "module_id",
+    "COLUMN_NAME": "module_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "module_templates",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "office_premises",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "office_premises",
+    "INDEX_NAME": "company_id_2",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "office_premises",
+    "INDEX_NAME": "company_id_2",
+    "COLUMN_NAME": "premise_type",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 2
+  },
+  {
+    "TABLE_NAME": "office_premises_documents",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "office_premises_documents",
+    "INDEX_NAME": "company_id_2",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "office_premises_documents",
+    "INDEX_NAME": "company_id_2",
+    "COLUMN_NAME": "premise_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 2
+  },
+  {
+    "TABLE_NAME": "office_premises_utilities",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "office_premise_attachments",
+    "INDEX_NAME": "premise_id",
+    "COLUMN_NAME": "premise_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "office_premise_attachments",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "premises_module_details",
+    "INDEX_NAME": "premise_id",
+    "COLUMN_NAME": "premise_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "premises_module_details",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 1,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "property_types",
+    "INDEX_NAME": "name",
+    "COLUMN_NAME": "name",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "users",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "company_id",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 1
+  },
+  {
+    "TABLE_NAME": "users",
+    "INDEX_NAME": "company_id",
+    "COLUMN_NAME": "email",
+    "NON_UNIQUE": 0,
+    "SEQ_IN_INDEX": 2
+  }
+]

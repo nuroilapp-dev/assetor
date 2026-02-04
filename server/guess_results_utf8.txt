@@ -1,0 +1,12 @@
+﻿Trying user: postgres, password: (empty)
+Failed: 3D000 - database "software_db" does not exist
+Trying user: postgres, password: password
+Failed: 3D000 - database "software_db" does not exist
+Trying user: postgres, password: admin
+Failed: 3D000 - database "software_db" does not exist
+Trying user: postgres, password: root
+Failed: 3D000 - database "software_db" does not exist
+Trying user: postgres, password: admin123
+Failed: 3D000 - database "software_db" does not exist
+Trying user: Administrator, password: (empty)
+Failed: 28000 - role "Administrator" does not exist
