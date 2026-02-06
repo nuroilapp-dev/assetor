@@ -4,6 +4,8 @@ import { Text, TextInput, Button, Switch, Menu, Divider, IconButton, Surface, Se
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../../api/client';
 import ModuleSectionFormModal from './ModuleSectionFormModal';
+import AlertDialog from '../AlertDialog';
+import ConfirmDialog from '../ConfirmDialog';
 
 const FIELD_TYPES = [
     { label: 'Textbox', value: 'text', icon: 'form-textbox' },
@@ -56,6 +58,18 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
     const [submitting, setSubmitting] = useState(false);
     const [showTypeMenu, setShowTypeMenu] = useState(false);
     const [editingFieldId, setEditingFieldId] = useState(null);
+
+    // Dialog States
+    const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info' });
+    const [confirmConfig, setConfirmConfig] = useState({ visible: false, title: '', message: '', onConfirm: () => { }, danger: false });
+
+    const showAlert = (title, message, type = 'info') => {
+        setAlertConfig({ visible: true, title, message, type });
+    };
+
+    const showConfirm = (title, message, onConfirm, danger = false) => {
+        setConfirmConfig({ visible: true, title, message, onConfirm, danger });
+    };
 
     // --- MULTI-DRAFT STATE & LOGIC ---
     // Instead of reusing the single form states, we use this array for creating new fields.
@@ -143,7 +157,7 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
         for (let i = 0; i < draftFields.length; i++) {
             const f = draftFields[i];
             if (!f.label || !f.field_key) {
-                Alert.alert('Validation Error', `Row ${i + 1} is missing Label or Key.`);
+                showAlert('Validation Error', `Row ${i + 1} is missing Label or Key.`, 'warning');
                 return;
             }
             // Check duplicates within draft
@@ -155,7 +169,7 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
         }
 
         if (conflicts.length > 0) {
-            Alert.alert('Duplicate Keys', 'The following keys already exist: ' + conflicts.join(', '));
+            showAlert('Duplicate Keys', 'The following keys already exist: ' + conflicts.join(', '), 'warning');
             return;
         }
 
@@ -178,13 +192,13 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
             });
 
             await Promise.all(promises);
-            Alert.alert('Success', 'All fields saved.');
+            showAlert('Success', 'All fields saved.', 'success');
             setDraftFields([]); // Clear
             fetchFields(selectedSection.id);
             // Add one new empty row automatically via useEffect
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'Failed to save fields. Check console.');
+            showAlert('Error', 'Failed to save fields. Check console.', 'error');
         } finally {
             setSubmitting(false);
         }
@@ -239,13 +253,13 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
         try {
             const res = await api.post('module-sections', sectionData);
             if (res.data.success || res.status === 200 || res.status === 201) {
-                Alert.alert('Success', 'Section created.');
+                showAlert('Success', 'Section created.', 'success');
                 await fetchSections();
                 setShowAddSectionModal(false);
             }
         } catch (error) {
             console.error('Save section error:', error);
-            Alert.alert('Error', 'Failed to create section.');
+            showAlert('Error', 'Failed to create section.', 'error');
         }
     };
 
@@ -311,7 +325,7 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
 
     const handleSaveField = async () => {
         if (!fieldLabel || !fieldKey || !selectedSection) {
-            Alert.alert('Missing Data', 'Please fill in required fields (Label, Key, Section)');
+            showAlert('Missing Data', 'Please fill in required fields (Label, Key, Section)', 'warning');
             return;
         }
 
@@ -347,12 +361,12 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
 
             if (res.data.success) {
                 console.log('[FieldBuilder] Field saved successfully!');
-                Alert.alert('Success', editingFieldId ? 'Field updated successfully!' : 'Field created successfully!');
+                showAlert('Success', editingFieldId ? 'Field updated successfully!' : 'Field created successfully!', 'success');
                 resetForm();
                 fetchFields(selectedSection.id);
             } else {
                 console.error('[FieldBuilder] Server returned success=false:', res.data);
-                Alert.alert('Error', res.data.message || 'Failed to save field');
+                showAlert('Error', res.data.message || 'Failed to save field', 'error');
             }
         } catch (error) {
             console.error('[FieldBuilder] Error saving field:', error);
@@ -362,7 +376,7 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
                 errorMessage = "API Endpoint Not Found (404). Please ensure the backend server is running the latest version.";
             }
 
-            Alert.alert('Error', errorMessage);
+            showAlert('Error', errorMessage, 'error');
         } finally {
             setSubmitting(false);
         }
@@ -381,33 +395,17 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
         } catch (error) {
             console.error(error);
             const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Server error';
-            if (Platform.OS === 'web') {
-                window.alert('Failed to delete field: ' + errMsg);
-            } else {
-                Alert.alert('Error', 'Failed to delete field: ' + errMsg);
-            }
+            showAlert('Error', 'Failed to delete field: ' + errMsg, 'error');
         }
     };
 
     const handleDeleteField = (field) => {
-        if (Platform.OS === 'web') {
-            if (window.confirm(`Are you sure you want to delete the field "${field.label}"? This cannot be undone.`)) {
-                performDelete(field);
-            }
-        } else {
-            Alert.alert(
-                'Confirm Delete',
-                `Are you sure you want to delete the field "${field.label}"? This cannot be undone.`,
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Delete',
-                        style: 'destructive',
-                        onPress: () => performDelete(field)
-                    }
-                ]
-            );
-        }
+        showConfirm(
+            'Confirm Delete',
+            `Are you sure you want to delete the field "${field.label}"? This cannot be undone.`,
+            () => performDelete(field),
+            true
+        );
     };
 
     // FIELD_TYPES moved to file scope
@@ -1150,6 +1148,21 @@ const FieldBuilderPanel = ({ moduleId, moduleName, readOnly = false, initialSect
                     </View>
                 </View>
             </View>
+            <AlertDialog
+                visible={alertConfig.visible}
+                onDismiss={() => setAlertConfig({ ...alertConfig, visible: false })}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+            />
+            <ConfirmDialog
+                visible={confirmConfig.visible}
+                onDismiss={() => setConfirmConfig({ ...confirmConfig, visible: false })}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                danger={confirmConfig.danger}
+            />
         </View>
     );
 };

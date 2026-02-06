@@ -46,6 +46,30 @@ const useAuthStore = create((set) => ({
         } else {
             console.warn('[AuthStore] No authentication found in storage');
         }
+    },
+
+    checkAuth: async () => {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+
+        try {
+            const response = await axios.get(`${API_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data.success) {
+                const user = response.data.user;
+                await AsyncStorage.setItem('user', JSON.stringify(user));
+                set({ user, isAuthenticated: true });
+                console.log('[AuthStore] Session refreshed with latest permissions');
+            }
+        } catch (error) {
+            console.error('[AuthStore] Session validation failed:', error);
+            if (error.response?.status === 401) {
+                // Token expired
+                get().logout();
+            }
+        }
     }
 }));
 

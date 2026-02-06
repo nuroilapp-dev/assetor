@@ -7,9 +7,11 @@ import DashboardScreen from '../screens/DashboardScreen';
 import AssetsScreen from '../screens/AssetsScreen';
 import AssetDisplayScreen from '../screens/AssetDisplayScreen';
 import PlaceholderScreen from '../screens/PlaceholderScreen';
+import SuperadminDashboardScreen from '../screens/SuperadminDashboardScreen';
 
 import OwnedPremisesScreen from '../screens/office/OwnedPremisesScreen';
 import RentalPremisesScreen from '../screens/office/RentalPremisesScreen';
+import GroupManagementScreen from '../screens/GroupManagementScreen';
 
 import JobWizardScreen from '../screens/wizard/JobWizardScreen';
 import ModulesHomeScreen from '../screens/modules/ModulesHomeScreen';
@@ -17,16 +19,16 @@ import ModuleDetailsScreen from '../screens/modules/ModuleDetailsScreen';
 import ModuleTemplatesScreen from '../screens/modules/ModuleTemplatesScreen';
 import ModuleSectionsScreen from '../screens/modules/ModuleSectionsScreen';
 import SubModulesScreen from '../screens/modules/SubModulesScreen';
+import EmployeesScreen from '../screens/EmployeesScreen';
 
 
 // Screen Wrappers
-const CompaniesScreen = (props) => <PlaceholderScreen {...props} title="Companies" icon="domain" actionLabel="Add Company" />;
+const CompaniesScreen = GroupManagementScreen;
 const SettingsScreen = (props) => <PlaceholderScreen {...props} title="Settings" icon="cog-outline" />;
 const OfficeOwnedScreen = OwnedPremisesScreen;
 const OfficeRentalScreen = RentalPremisesScreen;
 const CategoriesScreen = (props) => <PlaceholderScreen {...props} title="Asset Categories" icon="shape-outline" actionLabel="New Category" />;
 const DepartmentsScreen = (props) => <PlaceholderScreen {...props} title="Departments" icon="office-building-outline" actionLabel="New Department" />;
-const EmployeesScreen = (props) => <PlaceholderScreen {...props} title="Employees" icon="account-group-outline" actionLabel="Add Employee" />;
 const TrackingScreen = (props) => <PlaceholderScreen {...props} title="Asset Tracking" icon="map-marker-path" />;
 const MaintenanceScreen = (props) => <PlaceholderScreen {...props} title="Maintenance" icon="wrench-outline" actionLabel="New Request" />;
 const RequestsScreen = JobWizardScreen; // Wired to Job Wizard Demo for User Review
@@ -50,6 +52,7 @@ const MainNavigator = () => {
             }}
         >
             <Drawer.Screen name="Dashboard" component={DashboardScreen} />
+            <Drawer.Screen name="SuperadminDashboard" component={SuperadminDashboardScreen} />
             <Drawer.Screen name="Companies" component={CompaniesScreen} />
             <Drawer.Screen name="Settings" component={SettingsScreen} />
 

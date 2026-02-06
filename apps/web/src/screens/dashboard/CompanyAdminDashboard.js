@@ -8,10 +8,41 @@ import HealthDonutChart from '../../components/HealthDonutChart';
 import RecentAssetsTable from '../../components/RecentAssetsTable';
 import ProfileCard from '../../components/ProfileCard';
 import CalendarCard from '../../components/CalendarCard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import useAuthStore from '../../store/authStore';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5021/api';
 
 const CompanyAdminDashboard = ({ navigation }) => {
     const { width } = useWindowDimensions();
     const isDesktop = width >= 1200;
+    const { user } = useAuthStore();
+    const [stats, setStats] = React.useState({
+        total: 0,
+        assigned: 0,
+        available: 0,
+        clientCompanies: 0,
+        clientEmployees: 0
+    });
+
+    React.useEffect(() => {
+        fetchStats();
+    }, []);
+
+    const fetchStats = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const res = await axios.get(`${API_URL}/dashboard/summary`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data.success) {
+                setStats(res.data.data);
+            }
+        } catch (err) {
+            console.error('Error fetching dashboard stats:', err);
+        }
+    };
 
     return (
         <AppLayout navigation={navigation}>
@@ -24,29 +55,50 @@ const CompanyAdminDashboard = ({ navigation }) => {
                     {/* LEFT MAIN COLUMN */}
                     <View style={styles.mainColumn}>
 
-                        {/* 1. KPI Row (3 Cards - Specific Visuals) */}
+                        {/* 1. KPI Row (Stats) */}
                         <View style={styles.kpiRow}>
                             <KpiCard
                                 title="Total Assets"
-                                value="1,205" // Mock company scoped
+                                value={stats.total.toLocaleString()}
                                 icon="cube-outline"
                                 gradientColors={['#3b82f6', '#2563eb']}
                                 iconBg="rgba(255,255,255,0.2)"
                             />
                             <KpiCard
                                 title="Assigned Assets"
-                                value="950"
+                                value={stats.assigned.toLocaleString()}
                                 icon="account-check-outline"
-                                gradientColors={['#6366f1', '#4f46e5']} // Indigo
+                                gradientColors={['#6366f1', '#4f46e5']}
                                 iconBg="rgba(255,255,255,0.2)"
                             />
                             <KpiCard
                                 title="Available Assets"
-                                value="150"
+                                value={stats.available.toLocaleString()}
                                 icon="cube-send"
-                                gradientColors={['#f59e0b', '#d97706']} // Amber
+                                gradientColors={['#f59e0b', '#d97706']}
                                 iconBg="rgba(255,255,255,0.2)"
                             />
+                            {/* Client Level Stats */}
+                            {stats.clientCompanies > 0 && (
+                                <KpiCard
+                                    title="Companies Owned"
+                                    value={stats.clientCompanies}
+                                    icon="domain"
+                                    gradientColors={['#8b5cf6', '#7c3aed']}
+                                    iconBg="rgba(255,255,255,0.2)"
+                                    onPress={() => navigation.navigate('Companies')}
+                                />
+                            )}
+                            {stats.clientEmployees > 0 && (
+                                <KpiCard
+                                    title="Group Employees"
+                                    value={stats.clientEmployees.toLocaleString()}
+                                    icon="account-group"
+                                    gradientColors={['#10b981', '#059669']}
+                                    iconBg="rgba(255,255,255,0.2)"
+                                    onPress={() => navigation.navigate('Employees')}
+                                />
+                            )}
                         </View>
 
                         {/* 2. Usage Trend Chart (Area Chart) */}

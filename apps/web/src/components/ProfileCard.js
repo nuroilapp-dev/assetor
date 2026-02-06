@@ -5,7 +5,7 @@ import useAuthStore from '../store/authStore';
 
 const ProfileCard = () => {
     const user = useAuthStore((state) => state.user);
-    const role = user?.role?.replace('_', ' ') || 'User';
+    const role = user?.role === 'SUPER_ADMIN' ? 'Superadmin' : (user?.role?.replace('_', ' ') || 'User');
 
     return (
         <View style={styles.card}>

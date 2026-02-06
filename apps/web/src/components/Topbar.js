@@ -85,7 +85,9 @@ const Topbar = () => {
                     />
                     <View>
                         <Text style={styles.profileName}>{user?.name || 'TRakio Admin'}</Text>
-                        <Text style={styles.profileRole}>{user?.role?.replace('_', ' ') || 'COMPANY ADMIN'}</Text>
+                        <Text style={styles.profileRole}>
+                            {user?.role === 'SUPER_ADMIN' ? 'Superadmin' : (user?.role?.replace('_', ' ') || 'COMPANY ADMIN')}
+                        </Text>
                     </View>
                 </View>
             </View>

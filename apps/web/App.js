@@ -32,11 +32,17 @@ const theme = {
 };
 
 export default function App() {
-  const { isAuthenticated, loadStorage } = useAuthStore();
+  const { isAuthenticated, loadStorage, checkAuth } = useAuthStore();
 
   useEffect(() => {
     loadStorage();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      checkAuth();
+    }
+  }, [isAuthenticated]);
 
   return (
     <PaperProvider

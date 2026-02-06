@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useAuthStore from '../store/authStore';
 import OfficeSelectorModal from './modals/OfficeSelectorModal';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5032/api';
 
 const Sidebar = ({ activeRoute = 'Dashboard', navigation }) => {
     const user = useAuthStore((state) => state.user);
@@ -12,6 +16,15 @@ const Sidebar = ({ activeRoute = 'Dashboard', navigation }) => {
     // State
     const [collapsedGroups, setCollapsedGroups] = useState({});
     const [officeSelectorVisible, setOfficeSelectorVisible] = useState(false);
+    // Derived state
+    const activeModules = (userRole === 'SUPER_ADMIN')
+        ? ['dashboard', 'assets', 'premises', 'employees', 'maintenance', 'reports', 'premises_display', 'module', 'module_sections', 'sub_modules']
+        : (user?.enabled_modules && Array.isArray(user.enabled_modules) && user.enabled_modules.length > 0)
+            ? user.enabled_modules
+            : ['dashboard', 'assets', 'employees', 'premises', 'maintenance', 'reports']; // Fallback
+
+    // Debug
+    console.log('[Sidebar] Active Modules:', activeModules);
 
     const toggleGroup = (groupName) => {
         setCollapsedGroups(prev => ({
@@ -41,14 +54,15 @@ const Sidebar = ({ activeRoute = 'Dashboard', navigation }) => {
             title: null,
             items: [
                 { key: 'Dashboard', label: 'Dashboard', icon: 'view-dashboard-outline', roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
+                { key: 'SuperadminDashboard', label: 'Control Center', icon: 'shield-crown-outline', roles: ['SUPER_ADMIN'] },
             ]
         },
         {
             title: 'Platform Management',
             key: 'platform',
-            roles: ['SUPER_ADMIN'],
+            roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'],
             items: [
-                { key: 'Companies', label: 'Companies', icon: 'domain', roles: ['SUPER_ADMIN'] },
+                { key: 'Companies', label: 'Companies', icon: 'domain', roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
                 { key: 'Settings', label: 'Platform Settings', icon: 'cog-outline', roles: ['SUPER_ADMIN'] },
             ]
         },
@@ -69,12 +83,42 @@ const Sidebar = ({ activeRoute = 'Dashboard', navigation }) => {
             roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'],
             items: [
                 { key: 'AssetDisplay', label: 'Premises display', icon: 'monitor-dashboard', roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
+                { key: 'Employees', label: 'Staff members', icon: 'account-group-outline', roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
             ]
         },
 
     ];
 
+    // Helper function to check if module is enabled
+    const isModuleEnabled = (moduleKey) => {
+        // Super admin sees everything
+        if (userRole === 'SUPER_ADMIN') return true;
 
+        // Module mapping: sidebar keys to module_master names (or enabled_modules keys)
+        const moduleMapping = {
+            'Dashboard': 'dashboard',
+            'AssetDisplay': 'premises_display',
+            'Employees': 'employees',
+            'Maintenance': 'maintenance',
+            'Reports': 'reports',
+            'ModulesHome': 'module',
+            'ModuleSections': 'module_sections',
+            'SubModules': 'sub_modules',
+            'Companies': 'dashboard', // Usually basic access
+            'Settings': 'dashboard' // Usually basic access
+        };
+
+
+        // Always allow certain management pages
+        const alwaysEnabled = ['Dashboard', 'Companies', 'Settings', 'SuperadminDashboard'];
+        if (alwaysEnabled.includes(moduleKey)) return true;
+
+        // Check if module is in the enabled list
+        const moduleName = moduleMapping[moduleKey];
+        if (!moduleName) return false; // Unknown module, hide it
+
+        return activeModules.includes(moduleName);
+    };
 
     const handleLogout = async () => {
         await logout();
@@ -103,7 +147,9 @@ const Sidebar = ({ activeRoute = 'Dashboard', navigation }) => {
                 </View>
                 <View style={styles.userInfo}>
                     <Text style={styles.userName}>{user?.name || 'TRakio Admin'}</Text>
-                    <Text style={styles.userRole}>{userRole.replace('_', ' ')}</Text>
+                    <Text style={styles.userRole}>
+                        {userRole === 'SUPER_ADMIN' ? 'Superadmin' : userRole.replace('_', ' ')}
+                    </Text>
                 </View>
             </View>
 
@@ -113,7 +159,8 @@ const Sidebar = ({ activeRoute = 'Dashboard', navigation }) => {
                     if (group.roles && !group.roles.includes(userRole) && userRole !== 'SUPER_ADMIN') return null;
 
                     const visibleItems = group.items.filter(item =>
-                        item.roles.includes(userRole) || userRole === 'SUPER_ADMIN'
+                        (item.roles.includes(userRole) || userRole === 'SUPER_ADMIN') &&
+                        isModuleEnabled(item.key) // Check if module is enabled
                     );
 
                     if (visibleItems.length === 0) return null;
@@ -129,7 +176,9 @@ const Sidebar = ({ activeRoute = 'Dashboard', navigation }) => {
                                     activeOpacity={0.7}
                                     disabled={!group.key}
                                 >
-                                    <Text style={styles.groupTitle}>{group.title}</Text>
+                                    <Text style={styles.groupTitle}>
+                                        {group.key === 'platform' && userRole !== 'SUPER_ADMIN' ? 'Group Management' : group.title}
+                                    </Text>
                                     {group.key && (
                                         <MaterialCommunityIcons
                                             name={isCollapsed ? "chevron-right" : "chevron-down"}

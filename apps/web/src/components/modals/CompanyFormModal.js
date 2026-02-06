@@ -1,0 +1,795 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import BaseModal from './BaseModal';
+import axios from 'axios';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5021/api';
+
+const CompanyFormModal = ({ visible, onClose, onSave, clientId, clientName, company = null }) => {
+    const fileInputRef = useRef(null);
+    const [currentStep, setCurrentStep] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [documents, setDocuments] = useState([]); // [{ name, content, file_type, context }]
+    const [existingDocs, setExistingDocs] = useState([]);
+    const [uploadContext, setUploadContext] = useState(null);
+    const [propertyTypes, setPropertyTypes] = useState([]);
+
+    const [formData, setFormData] = useState({
+        // 1. Identity
+        name: '',
+        company_code: '',
+        trade_license: '',
+        tax_no: '',
+        industry: '',
+        logo: '',
+        subdomain: '',
+        // 2. Tenancy
+        tenancy_type: 'OWNED', // OWNED | RENTED
+        landlord_name: '',
+        contract_start_date: '',
+        contract_end_date: '',
+        registration_no: '',
+        ownership_doc_ref: '',
+        // 3. Location
+        country: '',
+        state: '',
+        city: '',
+        area: '',
+        address: '',
+        po_box: '',
+        makani_number: '',
+        // 4. Contact
+        telephone: '',
+        email: '',
+        website: '',
+        // 5. Limits
+        max_employees: 10,
+        max_assets: 20,
+        can_add_employee: true,
+        // 6. Admin
+        admin_name: '',
+        admin_email: '',
+        admin_password: '',
+        auto_generate_password: true,
+        status: 'ACTIVE'
+    });
+
+    useEffect(() => {
+        if (company) {
+            setFormData({
+                ...formData,
+                ...company,
+                can_add_employee: company.can_add_employee !== undefined ? company.can_add_employee : true,
+                max_employees: company.max_employees || 10,
+                max_assets: company.max_assets || 20,
+                status: company.status || 'ACTIVE'
+            });
+            fetchExistingDocs();
+        } else {
+            setFormData({
+                name: '',
+                company_code: '',
+                trade_license: '',
+                tax_no: '',
+                industry: '',
+                logo: '',
+                subdomain: '',
+                tenancy_type: 'OWNED',
+                landlord_name: '',
+                contract_start_date: '',
+                contract_end_date: '',
+                registration_no: '',
+                ownership_doc_ref: '',
+                country: '',
+                state: '',
+                city: '',
+                area: '',
+                address: '',
+                po_box: '',
+                makani_number: '',
+                telephone: '',
+                email: '',
+                website: '',
+                max_employees: 10,
+                max_assets: 20,
+                can_add_employee: true,
+                admin_name: '',
+                admin_email: '',
+                admin_password: '',
+                auto_generate_password: true,
+                status: 'ACTIVE'
+            });
+            setDocuments([]);
+            setExistingDocs([]);
+            setCurrentStep(1);
+        }
+        fetchPropertyTypes();
+    }, [company, visible]);
+
+    const fetchPropertyTypes = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const res = await axios.get(`${API_URL}/property-types`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data.success) {
+                setPropertyTypes(res.data.data);
+            }
+        } catch (err) {
+            console.error('Error fetching property types:', err);
+        }
+    };
+
+    const fetchExistingDocs = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const res = await axios.get(`${API_URL}/companies/${company.id}/documents`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data.success) {
+                setExistingDocs(res.data.data);
+            }
+        } catch (err) {
+            console.error('Error fetching docs:', err);
+        }
+    };
+
+    const steps = [
+        { id: 1, title: 'Identity', icon: 'domain' },
+        { id: 2, title: 'Tenancy', icon: 'home-city' },
+        { id: 3, title: 'Location', icon: 'map-marker' },
+        { id: 4, title: 'Contact', icon: 'phone' },
+        { id: 5, title: 'Documents', icon: 'file-document-outline' },
+        { id: 6, title: 'Limits', icon: 'shield-check' },
+        { id: 7, title: 'Admin', icon: 'account-plus' },
+    ];
+
+    const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, steps.length));
+    const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+
+    const handleFileUpload = (event) => {
+        const file = event.target.files[0];
+        console.log('[FilePicker] Selected file:', file ? file.name : 'none');
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            console.log('[FilePicker] Reader loaded content for:', file.name);
+            const content = e.target.result;
+            const newDoc = {
+                name: uploadContext ? `${uploadContext}_${file.name}` : file.name,
+                fileName: file.name,
+                content: content,
+                file_type: file.type,
+                size: (file.size / 1024).toFixed(2) + ' KB',
+                context: uploadContext
+            };
+            setDocuments(prev => [...prev, newDoc]);
+            if (uploadContext) {
+                setFormData(prev => ({ ...prev, [uploadContext]: file.fileName || file.name }));
+            }
+            setUploadContext(null);
+            if (event.target) event.target.value = '';
+        };
+        reader.onerror = (err) => console.error('[FilePicker] Reader error:', err);
+        reader.readAsDataURL(file);
+    };
+
+    const removeDocument = (index) => {
+        setDocuments(documents.filter((_, i) => i !== index));
+    };
+
+    const handleSave = async () => {
+        if (!formData.name) {
+            setError('Company name is required');
+            setCurrentStep(1);
+            return;
+        }
+
+        setError(null);
+        setLoading(true);
+        try {
+            let finalData = { ...formData, client_id: clientId };
+
+            // Generate password if auto-generate is on
+            if (!company && formData.auto_generate_password && !formData.admin_password) {
+                finalData.admin_password = 'Trakio' + Math.floor(1000 + Math.random() * 9000);
+            }
+
+            // Auto-generate subdomain if empty
+            if (!company && !formData.subdomain) {
+                finalData.subdomain = formData.name.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Math.floor(Math.random() * 1000);
+            }
+
+            // Save Company first (get ID)
+            const savedCompany = await onSave(finalData);
+            const targetId = company?.id || savedCompany?.id;
+
+            // Upload Documents if any
+            if (targetId && documents.length > 0) {
+                const token = await AsyncStorage.getItem('token');
+                console.log(`[Upload] Attempting to upload ${documents.length} files for company ${targetId}`);
+                for (const doc of documents) {
+                    try {
+                        const res = await axios.post(`${API_URL}/companies/${targetId}/documents`, doc, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        console.log(`[Upload] Success: ${doc.name} -> ${res.data.path}`);
+                    } catch (uploadErr) {
+                        console.error(`[Upload] Failed: ${doc.name}`, uploadErr.response?.data || uploadErr.message);
+                    }
+                }
+            }
+
+            onClose();
+        } catch (err) {
+            setError(err.response?.data?.detail || err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const renderInput = (label, key, placeholder, keyboard = 'default', multiline = false) => (
+        <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>{label}</Text>
+            <TextInput
+                style={[styles.input, multiline && styles.textArea]}
+                value={formData[key]?.toString()}
+                onChangeText={(text) => setFormData({ ...formData, [key]: text })}
+                placeholder={placeholder}
+                keyboardType={keyboard}
+                multiline={multiline}
+                placeholderTextColor="#94a3b8"
+            />
+        </View>
+    );
+
+    const renderInputWithFile = (label, key, placeholder) => {
+        const attachedFile = documents.find(d => d.context === key);
+
+        return (
+            <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>{label}</Text>
+                <View style={[styles.unifiedInput, attachedFile && styles.unifiedInputSuccess]}>
+                    <TextInput
+                        style={styles.flexInput}
+                        value={formData[key]?.toString()}
+                        onChangeText={(text) => setFormData({ ...formData, [key]: text })}
+                        placeholder={placeholder}
+                        placeholderTextColor="#94a3b8"
+                    />
+                    <TouchableOpacity
+                        style={[styles.inputAction, attachedFile && styles.inputActionSuccess]}
+                        onPress={() => {
+                            console.log('[UI] Triggering upload for context:', key);
+                            setUploadContext(key);
+                            fileInputRef.current?.click();
+                        }}
+                    >
+                        <MaterialCommunityIcons
+                            name={attachedFile ? "check-decagram" : "file-upload-outline"}
+                            size={22}
+                            color={attachedFile ? "#10b981" : "#3b82f6"}
+                        />
+                    </TouchableOpacity>
+                </View>
+                {attachedFile && (
+                    <View style={styles.premiumChip}>
+                        <View style={styles.chipBody}>
+                            <MaterialCommunityIcons name="file-check-outline" size={16} color="#059669" />
+                            <Text style={styles.chipText} numberOfLines={1}>{attachedFile.fileName}</Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setDocuments(documents.filter(d => d.context !== key))}
+                            style={styles.chipClose}
+                        >
+                            <MaterialCommunityIcons name="close" size={14} color="white" />
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    const renderStepContent = () => {
+        switch (currentStep) {
+            case 1: // Identity
+                return (
+                    <View style={styles.stepContent}>
+                        {renderInput('Company Name*', 'name', 'e.g. Acme Services LLC')}
+                        <View style={styles.row}>
+                            <View style={{ flex: 1 }}>{renderInput('Short Code', 'company_code', 'ACME')}</View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('Industry', 'industry', 'Technology')}</View>
+                        </View>
+                        {renderInputWithFile('Trade License', 'trade_license', 'TL-12345')}
+                        {renderInput('Tax / VAT No.', 'tax_no', 'VAT-98765')}
+                        {renderInput('Subdomain', 'subdomain', 'e.g. acme-services (optional)')}
+                    </View>
+                );
+            case 2: // Tenancy
+                return (
+                    <View style={styles.stepContent}>
+                        <Text style={styles.sectionTitle}>Tenancy / Ownership</Text>
+                        <View style={styles.typeSelector}>
+                            {propertyTypes.length > 0 ? (
+                                propertyTypes.map(type => {
+                                    const value = type.name.toUpperCase() === 'RENTAL' ? 'RENTED' : type.name.toUpperCase();
+                                    return (
+                                        <TouchableOpacity
+                                            key={type.id}
+                                            style={[styles.typeButton, formData.tenancy_type === value && styles.typeButtonActive]}
+                                            onPress={() => setFormData({ ...formData, tenancy_type: value })}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name={value === 'OWNED' ? 'home' : 'office-building'}
+                                                size={20}
+                                                color={formData.tenancy_type === value ? '#3b82f6' : '#64748b'}
+                                            />
+                                            <Text style={[styles.typeButtonText, formData.tenancy_type === value && styles.typeButtonTextActive]}>{type.name}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })
+                            ) : (
+                                ['OWNED', 'RENTED'].map(type => (
+                                    <TouchableOpacity
+                                        key={type}
+                                        style={[styles.typeButton, formData.tenancy_type === type && styles.typeButtonActive]}
+                                        onPress={() => setFormData({ ...formData, tenancy_type: type })}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name={type === 'OWNED' ? 'home' : 'office-building'}
+                                            size={20}
+                                            color={formData.tenancy_type === type ? '#3b82f6' : '#64748b'}
+                                        />
+                                        <Text style={[styles.typeButtonText, formData.tenancy_type === type && styles.typeButtonTextActive]}>{type}</Text>
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </View>
+                        {formData.tenancy_type === 'RENTED' ? (
+                            <>
+                                {renderInput('Landlord Name', 'landlord_name', 'Landlord Co.')}
+                                <View style={styles.row}>
+                                    <View style={{ flex: 1 }}>{renderInput('Start Date', 'contract_start_date', 'YYYY-MM-DD')}</View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('End Date', 'contract_end_date', 'YYYY-MM-DD')}</View>
+                                </View>
+                                {renderInputWithFile('Ejari / Registration No.', 'registration_no', 'REG-123-456')}
+                            </>
+                        ) : (
+                            renderInputWithFile('Ownership Doc Ref', 'ownership_doc_ref', 'DEED-789-012')
+                        )}
+                    </View>
+                );
+            case 3: // Location
+                return (
+                    <View style={styles.stepContent}>
+                        <View style={styles.row}>
+                            <View style={{ flex: 1 }}>{renderInput('Country', 'country', 'United Arab Emirates')}</View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('State/Emirate', 'state', 'Dubai')}</View>
+                        </View>
+                        {renderInput('City', 'city', 'Dubai')}
+                        {renderInput('Area / District', 'area', 'Downtown Dubai')}
+                        {renderInput('Full Address', 'address', 'Bldg 123, Office 456...', 'default', true)}
+                        <View style={styles.row}>
+                            <View style={{ flex: 1 }}>{renderInput('Makani / Plus Code', 'makani_number', '12345 67890')}</View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('PO Box', 'po_box', '12345')}</View>
+                        </View>
+                    </View>
+                );
+            case 4: // Contact
+                return (
+                    <View style={styles.stepContent}>
+                        {renderInput('Telephone', 'telephone', '+971 4 123 4567', 'phone-pad')}
+                        {renderInput('Company Email', 'email', 'info@acme.com', 'email-address')}
+                        {renderInput('Website', 'website', 'https://acme.com', 'url')}
+                    </View>
+                );
+            case 5: // Documents
+                return (
+                    <View style={styles.stepContent}>
+                        <Text style={styles.sectionTitle}>Company Documents</Text>
+                        <Text style={styles.infoBoxText}>Upload Trade License, Title Deeds, or Tenancy Contracts.</Text>
+
+                        <TouchableOpacity
+                            style={styles.uploadButton}
+                            onPress={() => {
+                                setUploadContext(null);
+                                fileInputRef.current?.click();
+                            }}
+                        >
+                            <MaterialCommunityIcons name="cloud-upload" size={24} color="#3b82f6" />
+                            <Text style={styles.uploadButtonText}>Select Document</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.docList}>
+                            {existingDocs.map((doc, idx) => (
+                                <View key={`existing-${idx}`} style={styles.docItem}>
+                                    <MaterialCommunityIcons name="file-check" size={20} color="#10b981" />
+                                    <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
+                                    <Text style={styles.existingTag}>Saved</Text>
+                                </View>
+                            ))}
+                            {documents.map((doc, idx) => (
+                                <View key={`new-${idx}`} style={styles.docItem}>
+                                    <MaterialCommunityIcons name="file-plus" size={20} color="#3b82f6" />
+                                    <View style={{ flex: 1, marginLeft: 10 }}>
+                                        <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
+                                        <Text style={styles.docSize}>{doc.size}</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => removeDocument(idx)}>
+                                        <MaterialCommunityIcons name="close-circle" size={20} color="#ef4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                );
+            case 6: // Limits & Privileges
+                return (
+                    <View style={styles.stepContent}>
+                        <View style={styles.row}>
+                            <View style={{ flex: 1 }}>{renderInput('Max Employees*', 'max_employees', '10', 'numeric')}</View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('Max Assets*', 'max_assets', '20', 'numeric')}</View>
+                        </View>
+                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>Privileges</Text>
+                        <TouchableOpacity
+                            style={styles.checkboxRow}
+                            onPress={() => setFormData({ ...formData, can_add_employee: !formData.can_add_employee })}
+                        >
+                            <MaterialCommunityIcons
+                                name={formData.can_add_employee ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                                size={22}
+                                color={formData.can_add_employee ? '#3b82f6' : '#cbd5e1'}
+                            />
+                            <Text style={styles.checkboxLabel}>Can Add Employees</Text>
+                        </TouchableOpacity>
+
+                        {company && (
+                            <View style={{ marginTop: 12 }}>
+                                <Text style={styles.inputLabel}>Account Status</Text>
+                                <View style={styles.typeSelector}>
+                                    {['ACTIVE', 'INACTIVE'].map(s => (
+                                        <TouchableOpacity
+                                            key={s}
+                                            style={[styles.typeButton, formData.status === s && (s === 'ACTIVE' ? styles.statusActive : styles.statusInactive)]}
+                                            onPress={() => setFormData({ ...formData, status: s })}
+                                        >
+                                            <Text style={[styles.typeButtonText, formData.status === s && styles.statusButtonTextActive]}>{s}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                );
+            case 7: // Admin User
+                return (
+                    <View style={styles.stepContent}>
+                        <Text style={styles.infoBoxText}>Create an administrative user who can manage this company.</Text>
+                        {renderInput('Admin Name*', 'admin_name', 'Full Name')}
+                        {renderInput('Admin Email*', 'admin_email', 'admin@company.com', 'email-address')}
+                        {!company && (
+                            <>
+                                <TouchableOpacity
+                                    style={styles.checkboxRow}
+                                    onPress={() => setFormData({ ...formData, auto_generate_password: !formData.auto_generate_password })}
+                                >
+                                    <MaterialCommunityIcons
+                                        name={formData.auto_generate_password ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                                        size={22}
+                                        color={formData.auto_generate_password ? '#3b82f6' : '#cbd5e1'}
+                                    />
+                                    <Text style={styles.checkboxLabel}>Auto-generate Temporary Password</Text>
+                                </TouchableOpacity>
+                                {!formData.auto_generate_password && renderInput('Admin Password*', 'admin_password', 'Min 8 chars')}
+                            </>
+                        )}
+                    </View>
+                );
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <BaseModal
+            visible={visible}
+            onClose={onClose}
+            title={company ? `Edit ${company.name}` : `Add Company to ${clientName}`}
+            width={650}
+        >
+            <View style={styles.mainContainer}>
+                {/* Progress Bar */}
+                <View style={styles.progressContainer}>
+                    {steps.map((step, idx) => (
+                        <React.Fragment key={step.id}>
+                            <TouchableOpacity
+                                style={[styles.progressStep, currentStep >= step.id && styles.progressStepActive]}
+                                onPress={() => setCurrentStep(step.id)}
+                            >
+                                <View style={[styles.stepIcon, currentStep === step.id && styles.stepIconCurrent]}>
+                                    <MaterialCommunityIcons name={step.icon} size={18} color={currentStep >= step.id ? '#3b82f6' : '#94a3b8'} />
+                                </View>
+                                <Text style={[styles.stepTitle, currentStep >= step.id && styles.stepTitleActive]}>{step.title}</Text>
+                            </TouchableOpacity>
+                            {idx < steps.length - 1 && <View style={[styles.progressLine, currentStep > step.id && styles.progressLineActive]} />}
+                        </React.Fragment>
+                    ))}
+                </View>
+
+                {error && (
+                    <View style={styles.errorBox}>
+                        <MaterialCommunityIcons name="alert-circle" size={20} color="#dc2626" />
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                )}
+
+                {/* Content */}
+                <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {renderStepContent()}
+                </ScrollView>
+
+                {Platform.OS === 'web' && (
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleFileUpload}
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    />
+                )}
+
+                {/* Footer Actions */}
+                <View style={styles.footer}>
+                    <TouchableOpacity
+                        style={[styles.footerButton, styles.backButton, currentStep === 1 && { opacity: 0 }]}
+                        onPress={prevStep}
+                        disabled={currentStep === 1}
+                    >
+                        <Text style={styles.backButtonText}>Back</Text>
+                    </TouchableOpacity>
+
+                    {currentStep < steps.length ? (
+                        <TouchableOpacity style={[styles.footerButton, styles.nextButton]} onPress={nextStep}>
+                            <Text style={styles.nextButtonText}>Next</Text>
+                            <MaterialCommunityIcons name="chevron-right" size={20} color="white" />
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.footerButton, styles.saveButton]}
+                            onPress={handleSave}
+                            disabled={loading}
+                        >
+                            {loading ? <ActivityIndicator color="white" /> : (
+                                <>
+                                    <Text style={styles.saveButtonText}>{company ? 'Update Company' : 'Finish & Create'}</Text>
+                                    <MaterialCommunityIcons name="check-all" size={20} color="white" style={{ marginLeft: 8 }} />
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+        </BaseModal>
+    );
+};
+
+const styles = StyleSheet.create({
+    mainContainer: { height: 600 },
+    progressContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingVertical: 20,
+        backgroundColor: '#f8fafc',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    progressStep: { alignItems: 'center', zIndex: 2 },
+    stepIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'white',
+        borderWidth: 2,
+        borderColor: '#e2e8f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    stepIconCurrent: { borderColor: '#3b82f6', backgroundColor: '#eff6ff' },
+    stepTitle: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
+    stepTitleActive: { color: '#3b82f6' },
+    progressLine: {
+        flex: 1,
+        height: 2,
+        backgroundColor: '#e2e8f0',
+        marginHorizontal: -10,
+        marginTop: -16,
+    },
+    progressLineActive: { backgroundColor: '#3b82f6' },
+    scrollContent: { flex: 1, padding: 24 },
+    stepContent: { animationDuration: '0.3s' },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 16 },
+    inputContainer: { marginBottom: 16 },
+    inputLabel: { fontSize: 12, fontWeight: '700', color: '#64748b', marginBottom: 6, textTransform: 'uppercase' },
+    input: {
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 10,
+        padding: 12,
+        fontSize: 14,
+        color: '#1e293b',
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+    },
+    textArea: { height: 80, textAlignVertical: 'top' },
+    row: { flexDirection: 'row' },
+    typeSelector: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+    typeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        backgroundColor: 'white',
+        gap: 8,
+    },
+    typeButtonActive: { borderColor: '#3b82f6', backgroundColor: '#eff6ff' },
+    typeButtonText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
+    typeButtonTextActive: { color: '#3b82f6' },
+    statusActive: { borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
+    statusInactive: { borderColor: '#ef4444', backgroundColor: '#fef2f2' },
+    statusButtonTextActive: { color: '#1e293b' },
+    infoBoxText: { fontSize: 13, color: '#64748b', backgroundColor: '#f0f9ff', padding: 12, borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#bae6fd' },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+    checkboxLabel: { fontSize: 14, color: '#475569', fontWeight: '500' },
+    errorBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fee2e2',
+        marginHorizontal: 24,
+        marginTop: 16,
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#fecaca',
+        gap: 8
+    },
+    errorText: { color: '#dc2626', fontSize: 13, fontWeight: '600', flex: 1 },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 24,
+        borderTopWidth: 1,
+        borderTopColor: '#f1f5f9',
+        backgroundColor: '#f8fafc',
+    },
+    footerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 10,
+    },
+    backButton: { backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0' },
+    backButtonText: { color: '#64748b', fontWeight: '600' },
+    nextButton: { backgroundColor: '#3b82f6' },
+    nextButtonText: { color: 'white', fontWeight: '700', marginRight: 4 },
+    saveButton: { backgroundColor: '#10b981' },
+    saveButtonText: { color: 'white', fontWeight: '700' },
+    uploadButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        borderColor: '#cbd5e1',
+        borderRadius: 12,
+        backgroundColor: '#f8fafc',
+        gap: 12,
+        marginBottom: 20,
+    },
+    uploadButtonText: { fontSize: 15, color: '#3b82f6', fontWeight: '700' },
+    docList: { gap: 10 },
+    docItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 10,
+    },
+    docName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#1e293b' },
+    docSize: { fontSize: 11, color: '#94a3b8' },
+    existingTag: { fontSize: 10, fontWeight: '700', color: '#10b981', backgroundColor: '#f0fdf4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, textTransform: 'uppercase' },
+    inlineUploadButton: {
+        backgroundColor: '#eff6ff',
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+        borderRadius: 10,
+        padding: 10,
+        marginLeft: 8,
+        height: 48,
+        width: 48,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    unifiedInput: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
+        borderRadius: 12,
+        paddingLeft: 4,
+        overflow: 'hidden',
+    },
+    unifiedInputSuccess: {
+        borderColor: '#10b981',
+        backgroundColor: '#f0fdf4',
+    },
+    flexInput: {
+        flex: 1,
+        height: 48,
+        paddingHorizontal: 12,
+        fontSize: 15,
+        color: '#1e293b',
+    },
+    inputAction: {
+        width: 48,
+        height: 48,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#white',
+        borderLeftWidth: 1,
+        borderLeftColor: '#e2e8f0',
+    },
+    inputActionSuccess: {
+        backgroundColor: '#f0fdf4',
+        borderLeftColor: '#dcfce7',
+    },
+    premiumChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#d1fae5',
+        borderRadius: 20,
+        paddingLeft: 10,
+        paddingRight: 4,
+        paddingVertical: 4,
+        marginTop: 8,
+        alignSelf: 'flex-start',
+        borderWidth: 1,
+        borderColor: '#10b981',
+    },
+    chipBody: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginRight: 8,
+    },
+    chipText: {
+        fontSize: 12,
+        color: '#065f46',
+        fontWeight: '700',
+        maxWidth: 200,
+    },
+    chipClose: {
+        backgroundColor: '#10b981',
+        borderRadius: 12,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    }
+});
+
+export default CompanyFormModal;
