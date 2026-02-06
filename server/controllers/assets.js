@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { checkClientLimit, checkCompanyLimit } = require('../utils/limitChecker');
 
 exports.getAssets = async (req, res) => {
     try {
@@ -31,6 +32,32 @@ exports.getAssetById = async (req, res) => {
 exports.createAsset = async (req, res) => {
     const { category_id, asset_code, name, brand, model, serial_number, purchase_date, purchase_cost, status, location, notes } = req.body;
     try {
+        // Enforce limits
+        const [company] = await db.execute('SELECT client_id FROM companies WHERE id = ?', [req.companyId]);
+        if (company.length > 0) {
+            // 1. Check Client Limit
+            if (company[0].client_id) {
+                const clientLimitStatus = await checkClientLimit(company[0].client_id, 'assets');
+                if (clientLimitStatus.exceeded) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'LIMIT_EXCEEDED',
+                        detail: `Total asset limit for this client reached (${clientLimitStatus.limit})`
+                    });
+                }
+            }
+
+            // 2. Check Company Limit
+            const companyLimitStatus = await checkCompanyLimit(req.companyId, 'assets');
+            if (companyLimitStatus.exceeded) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'LIMIT_EXCEEDED',
+                    detail: `Asset limit for this company reached (${companyLimitStatus.limit})`
+                });
+            }
+        }
+
         const [rows] = await db.execute(
             'INSERT INTO assets (company_id, category_id, asset_code, name, brand, model, serial_number, purchase_date, purchase_cost, status, location, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
             [req.companyId, category_id, asset_code, name, brand, model, serial_number, purchase_date, purchase_cost, status || 'AVAILABLE', location, notes]

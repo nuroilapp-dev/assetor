@@ -4,6 +4,10 @@ const tenantScope = async (req, res, next) => {
     // Super admins can access any company data if they provide a company_id in query or body
     // Otherwise, they default to no company_id (platform level) or specific context
 
+    if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
     if (req.user.role === 'SUPER_ADMIN') {
         req.companyId = req.query.company_id || req.body.company_id || null;
         return next();

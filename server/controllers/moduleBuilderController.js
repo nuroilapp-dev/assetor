@@ -13,7 +13,7 @@ exports.getModuleSections = async (req, res) => {
     try {
         const [sections] = await db.execute(
             'SELECT * FROM module_sections WHERE module_id = ? AND company_id = ? ORDER BY sort_order ASC',
-            [moduleId, req.user.company_id]
+            [moduleId, req.user?.company_id]
         );
         res.json({ success: true, data: sections });
     } catch (error) {
@@ -204,18 +204,24 @@ exports.updateField = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // 1. Update Field Table
-        await connection.execute(
-            `UPDATE module_section_fields 
-             SET label = ?, field_key = ?, field_type = ?, placeholder = ?, 
-                 is_required = ?, is_active = ?, sort_order = ?
-             WHERE id = ? AND company_id = ?`,
-            [
-                label, field_key, field_type, placeholder || null,
-                is_required ? 1 : 0, is_active ? 1 : 0, sort_order || 0,
-                fieldId, req.user.company_id
-            ]
-        );
+        let updateQuery = `
+            UPDATE module_section_fields 
+            SET label = ?, field_key = ?, field_type = ?, placeholder = ?, 
+                is_required = ?, is_active = ?, sort_order = ?
+            WHERE id = ?
+        `;
+        let updateParams = [
+            label, field_key, field_type, placeholder || null,
+            is_required ? 1 : 0, is_active ? 1 : 0, sort_order || 0,
+            fieldId
+        ];
+
+        if (req.user.role !== 'SUPER_ADMIN') {
+            updateQuery += ' AND company_id = ?';
+            updateParams.push(req.user.company_id);
+        }
+
+        await connection.execute(updateQuery, updateParams);
 
         // 2. Sync Options
         // Delete existing

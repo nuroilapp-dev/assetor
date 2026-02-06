@@ -1,9 +1,0 @@
-﻿[dotenv@17.2.3] injecting env (7) from .env -- tip: ΓÜÖ∩╕Å  load multiple .env files with { path: ['.env.local', '.env'] }
-Connected to MySQL Database
-F ID: 1 | Label: water  | S_ID: 2 | M_ID: 1 | C_ID: 1
-F ID: 2 | Label: 22 | S_ID: 27 | M_ID: 5 | C_ID: 1
-F ID: 3 | Label: test | S_ID: 28 | M_ID: 5 | C_ID: 1
-F ID: 4 | Label: sdrfwer | S_ID: 27 | M_ID: 5 | C_ID: 1
-F ID: 5 | Label: Premises ID | S_ID: 1 | M_ID: 1 | C_ID: 1
-F ID: 6 | Label: Premises Name | S_ID: 1 | M_ID: 1 | C_ID: 1
-F ID: 7 | Label: Premises Type | S_ID: 1 | M_ID: 1 | C_ID: 1

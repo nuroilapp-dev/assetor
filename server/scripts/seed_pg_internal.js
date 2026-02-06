@@ -27,7 +27,7 @@ async function seed() {
         console.log('Inserting Admin User...');
         const hashedPassword = await bcrypt.hash('admin123', 10);
         await db.execute(
-            "INSERT INTO users (company_id, name, email, password, role, status) VALUES (1, 'Admin', 'admin@trakio.com', ?, 'COMPANY_ADMIN', 'ACTIVE') ON CONFLICT DO NOTHING",
+            "INSERT INTO users (company_id, name, email, password, role, status) VALUES (1, 'TRakio Admin', 'admin@trakio.com', ?, 'COMPANY_ADMIN', 'ACTIVE') ON CONFLICT DO NOTHING",
             [hashedPassword]
         );
 

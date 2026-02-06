@@ -16,15 +16,36 @@ exports.getSummary = async (req, res) => {
         console.log('Total Query:', totalQuery);
         const [total] = await db.execute(totalQuery, params);
 
-        const assignedQuery = `SELECT COUNT(*) as count FROM assets ${whereClause} ${whereClause ? 'AND' : 'WHERE'} status = "ASSIGNED"`;
-        console.log('Assigned Query:', assignedQuery);
+        const assignedQuery = `SELECT COUNT(*) as count FROM assets ${whereClause} ${whereClause ? 'AND' : 'WHERE'} status = 'ASSIGNED'`;
         const [assigned] = await db.execute(assignedQuery, params);
 
-        const availableQuery = `SELECT COUNT(*) as count FROM assets ${whereClause} ${whereClause ? 'AND' : 'WHERE'} status = "AVAILABLE"`;
+        const availableQuery = `SELECT COUNT(*) as count FROM assets ${whereClause} ${whereClause ? 'AND' : 'WHERE'} status = 'AVAILABLE'`;
         const [available] = await db.execute(availableQuery, params);
 
-        const maintenanceQuery = `SELECT COUNT(*) as count FROM assets ${whereClause} ${whereClause ? 'AND' : 'WHERE'} status = "MAINTENANCE"`;
+        const maintenanceQuery = `SELECT COUNT(*) as count FROM assets ${whereClause} ${whereClause ? 'AND' : 'WHERE'} status = 'MAINTENANCE'`;
         const [maintenance] = await db.execute(maintenanceQuery, params);
+
+        // Client-Specific Stats (Cross-company)
+        let clientCompanies = 0;
+        let clientEmployees = 0;
+        let clientId = req.user?.client_id;
+
+        // Fallback: If no direct client_id on user, find it from their company
+        if (!clientId && companyId) {
+            const [comp] = await db.execute('SELECT client_id FROM companies WHERE id = ?', [companyId]);
+            if (comp.length > 0) clientId = comp[0].client_id;
+        }
+
+        if (clientId) {
+            const [compRows] = await db.execute('SELECT COUNT(*) as count FROM companies WHERE client_id = ?', [clientId]);
+            clientCompanies = compRows[0].count;
+
+            const [empRows] = await db.execute(
+                'SELECT COUNT(*) as count FROM employees WHERE company_id IN (SELECT id FROM companies WHERE client_id = ?)',
+                [clientId]
+            );
+            clientEmployees = empRows[0].count;
+        }
 
         res.json({
             success: true,
@@ -32,7 +53,9 @@ exports.getSummary = async (req, res) => {
                 total: total[0].count,
                 assigned: assigned[0].count,
                 available: available[0].count,
-                maintenance: maintenance[0].count
+                maintenance: maintenance[0].count,
+                clientCompanies: parseInt(clientCompanies),
+                clientEmployees: parseInt(clientEmployees)
             }
         });
     } catch (error) {

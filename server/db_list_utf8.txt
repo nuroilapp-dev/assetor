@@ -1,2 +1,0 @@
-﻿Connected to "postgres" database successfully!
-Databases available: [ 'postgres', 'template1', 'template0' ]

@@ -27,7 +27,7 @@ SELECT 2, id, TRUE FROM modules_master WHERE module_key IN ('dashboard', 'assets
 
 -- 4. Insert Users (Plain text passwords for development as requested)
 INSERT INTO users (company_id, name, email, password, role) VALUES 
-(NULL, 'System Admin', 'superadmin@trakio.com', 'admin123', 'SUPER_ADMIN'),
+(NULL, 'Superadmin', 'superadmin@trakio.com', 'admin123', 'SUPER_ADMIN'),
 (1, 'TRakio Admin', 'admin@trakio.com', 'admin123', 'COMPANY_ADMIN'),
 (2, 'TechSol Admin', 'admin@techsol.com', 'admin123', 'COMPANY_ADMIN'),
 (1, 'John Doe Employee', 'john@trakio.com', 'user123', 'EMPLOYEE');

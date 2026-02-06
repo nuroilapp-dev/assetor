@@ -31,7 +31,7 @@ exports.getTemplates = async (req, res) => {
             WHERE t.company_id = ? AND t.is_active = 1
             ORDER BY t.created_at DESC
         `;
-        const [rows] = await db.execute(query, [req.user.company_id]);
+        const [rows] = await db.execute(query, [req.user?.company_id]);
         res.json({ success: true, data: rows });
     } catch (error) {
         console.error('getTemplates error:', error);

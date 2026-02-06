@@ -14,7 +14,7 @@ INSERT INTO module_master (module_name) VALUES
 -- 3. Insert Users (Note: Passwords here are bcrypt hashes for 'admin123')
 -- Hash for 'admin123': $2a$10$wNghUvj3tB4zD4U8k6r4u.mH6HkY1oXpYp2/vYOn/lYy/Y6T3B9Uy
 INSERT INTO users (company_id, name, email, password, role) VALUES 
-(NULL, 'System Admin', 'superadmin@trakio.com', '$2a$10$wNghUvj3tB4zD4U8k6r4u.mH6HkY1oXpYp2/vYOn/lYy/Y6T3B9Uy', 'SUPER_ADMIN'),
+(NULL, 'Superadmin', 'superadmin@trakio.com', '$2a$10$wNghUvj3tB4zD4U8k6r4u.mH6HkY1oXpYp2/vYOn/lYy/Y6T3B9Uy', 'SUPER_ADMIN'),
 (1, 'TRakio Admin', 'admin@trakio.com', '$2a$10$wNghUvj3tB4zD4U8k6r4u.mH6HkY1oXpYp2/vYOn/lYy/Y6T3B9Uy', 'COMPANY_ADMIN');
 
 -- 4. Enable a module for Company 1

@@ -17,5 +17,6 @@ router.get('/premises/:id', officeController.getPremiseById);
 router.put('/premises/:id', officeController.updatePremise);
 router.delete('/premises/:id', officeController.deletePremise);
 router.post('/premises/:id/documents', officeController.addPremiseDocument);
+router.get('/property-types', officeController.getPropertyTypes);
 
 module.exports = router;

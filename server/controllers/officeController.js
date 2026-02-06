@@ -15,7 +15,7 @@ const EXCLUDED_KEYS = new Set([
 // List Premises
 exports.getPremises = async (req, res) => {
     const { type, search, page, limit } = req.query;
-    const companyId = req.companyId || req.user.company_id;
+    const companyId = req.companyId || (req.user && req.user.company_id);
 
     // Pagination Logic
     const pageNum = parseInt(page) || 1;
@@ -27,6 +27,11 @@ exports.getPremises = async (req, res) => {
     const isSummaryView = !type || type === 'undefined' || type === 'null' || type === '';
 
     try {
+        if (!req.user) {
+            console.error('[getPremises] req.user is undefined!');
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
         let query = '';
         let params = [];
         let countQuery = '';
@@ -37,8 +42,10 @@ exports.getPremises = async (req, res) => {
             let whereClause = companyId ? 'WHERE p.company_id = ?' : 'WHERE 1=1';
             let searchClause = '';
 
-            params.push(companyId);
-            countParams.push(companyId);
+            if (companyId) {
+                params.push(companyId);
+                countParams.push(companyId);
+            }
 
             if (search && search !== 'undefined') {
                 searchClause = ` AND (p.premises_name LIKE ? OR p.building_name LIKE ? OR p.city LIKE ?)`;
@@ -66,8 +73,10 @@ exports.getPremises = async (req, res) => {
             }
 
             let searchClause = '';
-            params.push(companyId);
-            countParams.push(companyId);
+            const typeWhere = companyId ? 'p.company_id = ? AND p.premise_type = ?' : 'p.premise_type = ?';
+
+            params = companyId ? [companyId, type] : [type];
+            countParams = companyId ? [companyId, type] : [type];
 
             if (search) {
                 searchClause = ` AND (p.premises_name LIKE ? OR p.building_name LIKE ? OR p.city LIKE ?)`;
@@ -76,12 +85,12 @@ exports.getPremises = async (req, res) => {
                 countParams.push(searchParam, searchParam, searchParam);
             }
 
-            const baseUrl = process.env.SERVER_PUBLIC_URL || 'http://localhost:5026';
+            const baseUrl = process.env.SERVER_PUBLIC_URL || 'http://localhost:5031';
             const docCol = `, p.document_name, p.document_path, p.document_mime, 
                 a.name as area,
                 CASE WHEN p.document_path IS NOT NULL THEN CONCAT('${baseUrl}', p.document_path) ELSE NULL END as document_url`;
 
-            countQuery = `SELECT COUNT(*) as total FROM office_premises p WHERE p.company_id = ? AND p.premise_type = '${type}' ${searchClause}`;
+            countQuery = `SELECT COUNT(*) as total FROM office_premises p WHERE ${typeWhere} ${searchClause}`;
 
             if (type === 'OWNED') {
                 query = `
@@ -89,7 +98,7 @@ exports.getPremises = async (req, res) => {
                     FROM office_premises p
                     LEFT JOIN area a ON p.area_id = a.id
                     LEFT JOIN office_owned_details d ON p.premise_id = d.premise_id
-                    WHERE p.company_id = ? AND p.premise_type = 'OWNED' ${searchClause}
+                    WHERE ${typeWhere} ${searchClause}
                     ORDER BY p.created_at DESC
                 `;
             } else {
@@ -98,7 +107,7 @@ exports.getPremises = async (req, res) => {
                     FROM office_premises p
                     LEFT JOIN area a ON p.area_id = a.id
                     LEFT JOIN office_rental_details d ON p.premise_id = d.premise_id
-                    WHERE p.company_id = ? AND p.premise_type = 'RENTAL' ${searchClause}
+                    WHERE ${typeWhere} ${searchClause}
                     ORDER BY p.created_at DESC
                 `;
             }
@@ -138,9 +147,9 @@ exports.getPremises = async (req, res) => {
 // Get Single Premise
 exports.getPremiseById = async (req, res) => {
     const { id } = req.params;
-    let companyId = req.companyId || req.user.company_id;
+    let companyId = req.companyId || (req.user && req.user.company_id);
 
-    if (!companyId) {
+    if (!companyId && req.user) {
         try {
             const [u] = await db.execute('SELECT company_id FROM users WHERE id = ?', [req.user.id]);
             if (u.length > 0) companyId = u[0].company_id;
@@ -219,8 +228,8 @@ exports.getPremiseById = async (req, res) => {
 // Add Document to Premise
 exports.addPremiseDocument = async (req, res) => {
     const { id } = req.params;
-    let companyId = req.companyId || req.user.company_id;
-    if (!companyId) {
+    let companyId = req.companyId || (req.user && req.user.company_id);
+    if (!companyId && req.user) {
         try {
             const [u] = await db.execute('SELECT company_id FROM users WHERE id = ?', [req.user.id]);
             if (u.length > 0) companyId = u[0].company_id;
@@ -273,15 +282,15 @@ exports.createPremise = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        let companyId = req.companyId || req.user.company_id;
+        let companyId = req.companyId || (req.user && req.user.company_id);
         // Robustness: Fetch if missing
-        if (!companyId) {
+        if (!companyId && req.user) {
             const [u] = await connection.execute('SELECT company_id FROM users WHERE id = ?', [req.user.id]);
             if (u.length > 0) companyId = u[0].company_id;
         }
 
-        if (!companyId) { // Still missing
-            throw new Error('Company Context Missing');
+        if (!companyId) {
+            return res.status(400).json({ success: false, message: 'Company Identification Missing. Please login again.' });
         }
 
         const body = req.body;
@@ -434,9 +443,9 @@ exports.updatePremise = async (req, res) => {
         await connection.beginTransaction();
 
         const { id } = req.params;
-        let companyId = req.companyId || req.user.company_id;
+        let companyId = req.companyId || (req.user && req.user.company_id);
         // Robustness: Fetch if missing
-        if (!companyId) {
+        if (!companyId && req.user) {
             const [u] = await connection.execute('SELECT company_id FROM users WHERE id = ?', [req.user.id]);
             if (u.length > 0) companyId = u[0].company_id;
         }
@@ -605,7 +614,7 @@ exports.updatePremise = async (req, res) => {
 // Delete Premise
 exports.deletePremise = async (req, res) => {
     const { id } = req.params;
-    const companyId = req.user.company_id;
+    const companyId = req.companyId || (req.user && req.user.company_id);
 
     try {
         const [rows] = await db.execute(
@@ -644,17 +653,25 @@ exports.uploadFile = async (req, res) => {
         }
 
         // Generate unique filename
-        const uniqueName = `${Date.now()}_${name.replace(/\s+/g, '_')} `;
+        const uniqueName = `${Date.now()}_${name.replace(/\s+/g, '_')}`;
         const filePath = path.join(uploadDir, uniqueName);
 
         fs.writeFileSync(filePath, base64Data, 'base64');
 
         // Return relative path for DB
-        const relativePath = `/ uploads / premises / ${uniqueName} `;
+        const relativePath = `/uploads/premises/${uniqueName}`;
         res.json({ success: true, path: relativePath });
 
     } catch (error) {
         console.error('Upload failed:', error);
         res.status(500).json({ success: false, message: 'Upload failed' });
+    }
+};
+exports.getPropertyTypes = async (req, res) => {
+    try {
+        const [rows] = await db.execute('SELECT * FROM property_types ORDER BY id');
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 };

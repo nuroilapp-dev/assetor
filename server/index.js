@@ -46,9 +46,11 @@ const dashboardRoutes = require('./routes/dashboard');
 const reportRoutes = require('./routes/reports');
 const officeRoutes = require('./routes/office');
 const moduleBuilderRoutes = require('./routes/moduleBuilder');
+const clientRoutes = require('./routes/clients');
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/clients', clientRoutes);
 
 // Specific paths FIRST to avoid collision
 app.use('/api/module-builder', moduleBuilderRoutes);
