@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "expo build:web",
+    "serve:web": "serve -s web-build -l 3000"
   },
   "dependencies": {
     "@babel/core": "^7.28.6",
