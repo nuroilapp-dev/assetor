@@ -19,16 +19,28 @@ exports.getEmployees = async (req, res) => {
             LEFT JOIN departments d ON e.department_id = d.id
         `;
         let params = [];
+        let conditions = [];
 
-        // If not super admin, filter by company/client
-        if (req.user?.role !== 'SUPER_ADMIN') {
-            if (req.user?.company_id) {
-                sql += ' WHERE e.company_id = ?';
+        // 1. Check for explicit company filter in query (Superadmin or filtered view)
+        if (req.query.company_id) {
+            conditions.push('e.company_id = ?');
+            params.push(req.query.company_id);
+        }
+
+        // 2. If not super admin, enforce access restrictions
+        if (req.user && req.user.role !== 'SUPER_ADMIN') {
+            if (req.user.company_id) {
+                // If they tried to filter for another company, this will override it or we could throw error.
+                // For safety, we enforce their own company.
+                conditions.length = 0; // Clear previous
+                params.length = 0;     // Clear previous
+                conditions.push('e.company_id = ?');
                 params.push(req.user.company_id);
             }
-        } else if (req.query.company_id) {
-            sql += ' WHERE e.company_id = ?';
-            params.push(req.query.company_id);
+        }
+
+        if (conditions.length > 0) {
+            sql += ' WHERE ' + conditions.join(' AND ');
         }
 
         sql += ' ORDER BY e.id DESC';

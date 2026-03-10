@@ -2,7 +2,16 @@ const db = require('../config/db');
 
 exports.getAllConfigs = async (req, res) => {
     try {
-        const [configs] = await db.execute('SELECT * FROM smtp_configs ORDER BY created_at DESC');
+        let sql = 'SELECT * FROM smtp_configs';
+        let params = [];
+
+        if (req.user?.role === 'COMPANY_ADMIN') {
+            sql += ' WHERE company_id = ?';
+            params.push(req.user.company_id);
+        }
+
+        sql += ' ORDER BY created_at DESC';
+        const [configs] = await db.execute(sql, params);
         res.json({ success: true, configs });
     } catch (err) {
         console.error('Error fetching SMTP configs:', err);
@@ -30,30 +39,29 @@ exports.createConfig = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Please provide all required fields' });
     }
 
+    // Determine company_id scope
+    const company_id = req.user?.role === 'COMPANY_ADMIN' ? req.user.company_id : (req.body.company_id || null);
+
     try {
-        // If this config is set to active, deactivate all others first if desired.
-        // For now, let's assume only one active config makes sense, so we deactivate others.
         if (is_active) {
-            await db.execute('UPDATE smtp_configs SET is_active = false');
+            // Only deactivate within the same scope
+            if (company_id) {
+                await db.execute('UPDATE smtp_configs SET is_active = false WHERE company_id = ?', [company_id]);
+            } else {
+                await db.execute('UPDATE smtp_configs SET is_active = false WHERE company_id IS NULL');
+            }
         }
 
         const query = `
-            INSERT INTO smtp_configs (name, host, port, username, password, encryption, from_email, from_name, reply_to, is_active, debug_mode)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO smtp_configs (name, host, port, username, password, encryption, from_email, from_name, reply_to, is_active, debug_mode, company_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const params = [
-            name,
-            host,
-            port || 587,
-            username,
-            password,
-            encryption || 'tls',
-            from_email,
-            from_name || '',
-            reply_to || '',
-            is_active ? true : false,
-            debug_mode ? true : false
+            name, host, port || 587, username, password,
+            encryption || 'tls', from_email, from_name || '',
+            reply_to || '', is_active ? true : false,
+            debug_mode ? true : false, company_id
         ];
 
         await db.execute(query, params);
