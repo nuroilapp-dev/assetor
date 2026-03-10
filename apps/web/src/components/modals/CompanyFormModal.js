@@ -345,10 +345,7 @@ const CompanyFormModal = ({ visible, onClose, onSave, clientId, clientName, comp
                             <View style={{ flex: 1 }}>{renderInput('Short Code', 'company_code', 'ACME')}</View>
                             <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('Industry', 'industry', 'Technology')}</View>
                         </View>
-                        {renderInputWithFile('Trade License', 'trade_license', 'TL-12345')}
-                        {renderInputWithFile('Premise document', 'premise_document', 'e.g. Title Deed')}
-                        {renderInput('Tax / VAT No.', 'tax_no', 'VAT-98765')}
-                        {renderInput('Subdomain', 'subdomain', 'e.g. acme-services (optional)')}
+
                     </View>
                 );
 

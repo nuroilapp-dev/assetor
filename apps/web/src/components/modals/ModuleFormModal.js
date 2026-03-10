@@ -643,20 +643,30 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                         </View>
                     )}
 
-                    <View style={styles.builderContainer}><FieldBuilderPanel moduleId={currentMasterId} moduleName={currentModuleName} readOnly={viewOnly} initialSectionName={initialSection} /></View>
+                    <View style={styles.builderContainer}>
+                        <FieldBuilderPanel
+                            moduleId={currentMasterId}
+                            moduleName={currentModuleName}
+                            readOnly={viewOnly}
+                            initialSectionName={initialSection}
+                            onClose={onClose}
+                        />
+                    </View>
                 </View>
 
-                <View style={styles.footer}>
-                    <Button
-                        mode="outlined"
-                        onPress={onClose}
-                        textColor="#3b82f6"
-                        style={styles.modalCancelBtn}
-                        labelStyle={{ fontWeight: '700', fontSize: 15 }}
-                    >
-                        Close
-                    </Button>
-                </View>
+                {viewOnly && (
+                    <View style={styles.footer}>
+                        <Button
+                            mode="outlined"
+                            onPress={onClose}
+                            textColor="#3b82f6"
+                            style={styles.modalCancelBtn}
+                            labelStyle={{ fontWeight: '700', fontSize: 15 }}
+                        >
+                            Close
+                        </Button>
+                    </View>
+                )}
 
             </Modal>
             <Snackbar

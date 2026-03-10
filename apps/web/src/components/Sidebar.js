@@ -66,7 +66,7 @@ export const MENU_GROUPS = [
         roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'],
         items: [
             { key: 'Settings', label: 'Platform Settings', icon: 'cog-outline', roles: ['SUPER_ADMIN'] },
-            { key: 'SMTPSettings', label: 'SMTP Settings', icon: 'email-cog-outline', roles: ['SUPER_ADMIN'] },
+            { key: 'SMTPSettings', label: 'SMTP Settings', icon: 'email-cog-outline', roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
             { key: 'Roles', label: 'Roles', icon: 'shield-account-outline', roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
         ]
     },
