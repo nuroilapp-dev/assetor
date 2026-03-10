@@ -27,6 +27,12 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
     const [selectedArea, setSelectedArea] = useState(null);
     const [areaMenu, setAreaMenu] = useState(false);
 
+    const [regions, setRegions] = useState([]);
+    const [selectedRegion, setSelectedRegion] = useState(null);
+    const [regionMenu, setRegionMenu] = useState(false);
+
+    const [vehicleUsages, setVehicleUsages] = useState([]);
+
     const [selectedPropertyType, setSelectedPropertyType] = useState(null);
     const [ownershipMenu, setOwnershipMenu] = useState(false);
     const [propertyTypes, setPropertyTypes] = useState([]); // Added state
@@ -40,17 +46,18 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
             // Fetch dropdown data
             const fetchDropdowns = async () => {
                 try {
-                    const [cRes, ptRes, aRes, propRes] = await Promise.all([
+                    const [cRes, ptRes, aRes, propRes, vuRes] = await Promise.all([
                         api.get('countries'),
                         api.get('premises-types'),
                         api.get('areas'),
-                        api.get('property-types') // Fetch property types
+                        api.get('property-types'),
+                        api.get('vehicle-usage')
                     ]);
                     if (cRes.data?.success) setCountries(cRes.data.data);
                     if (ptRes.data?.success) setPremisesTypes(ptRes.data.data);
-                    // Handle area response structure if different
                     if (aRes.data?.success || Array.isArray(aRes.data)) setAreas(aRes.data.data || aRes.data);
-                    if (propRes.data?.success) setPropertyTypes(propRes.data.data); // Set property types
+                    if (propRes.data?.success) setPropertyTypes(propRes.data.data);
+                    if (vuRes.data?.success) setVehicleUsages(vuRes.data.data);
                 } catch (e) {
                     console.error('Error fetching dropdowns:', e);
                 }
@@ -65,13 +72,26 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                     id: module.id // Current instance ID
                 });
                 setStatus(module.status);
-                // Set initial values if available in 'module' object
-                // Assuming module object has these IDs or we need to find them
-                // For now, we might leave them null or try to match if IDs are present
-                if (module.country_id) setSelectedCountry({ id: module.country_id, name: module.country_name }); // Mock object if full obj not available
-                if (module.property_type_id) setSelectedPropertyType({ id: module.property_type_id, name: module.property_type });
-                if (module.premises_type_id) setSelectedType({ id: module.premises_type_id, type_name: module.premises_type });
-                if (module.area_id) setSelectedArea({ id: module.area_id, name: module.area_name });
+                // Match from existing catalog/dropdowns if possible, or create placeholder objects
+                if (module.country_id !== undefined) {
+                    setSelectedCountry(module.country_id === null ? { name: 'All', id: null, isAll: true } : { id: module.country_id, name: module.country });
+                }
+                if (module.property_type_id !== undefined) {
+                    setSelectedPropertyType(module.property_type_id === null ? { name: 'All', id: null, isAll: true } : { id: module.property_type_id, name: module.property_type });
+                }
+                if (module.premises_type_id !== undefined) {
+                    setSelectedType(module.premises_type_id === null ? { type_name: 'All', id: null, isAll: true } : { id: module.premises_type_id, type_name: module.premises_type });
+                }
+                if (module.area_id !== undefined) {
+                    setSelectedArea(module.area_id === null ? { name: 'All', id: null, isAll: true } : { id: module.area_id, name: module.section_area });
+                }
+                if (module.vehicle_usage_id !== undefined && module.vehicle_usage_id !== null) {
+                    const usage = vehicleUsages.find(u => u.id === module.vehicle_usage_id);
+                    setSelectedType(usage ? { id: usage.id, type_name: usage.name } : { id: module.vehicle_usage_id, type_name: module.vehicle_usage });
+                }
+                if (module.region !== undefined) {
+                    setSelectedRegion(module.region === null ? { name: 'All', id: null, isAll: true } : { name: module.region });
+                }
             } else {
                 // New module registration
                 setSelectedMaster(null);
@@ -79,6 +99,7 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                 setSelectedCountry(null);
                 setSelectedType(null);
                 setSelectedArea(null);
+                setSelectedRegion(null);
                 setSelectedPropertyType(null);
                 setSearchQuery('');
             }
@@ -99,6 +120,80 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
             setCatalogLoading(false);
         }
     };
+
+    // Fetch regions when country changes
+    useEffect(() => {
+        const fetchRegions = async () => {
+            setRegions([]);
+            // Don't reset selectedRegion if we are in edit mode or have a country selected
+            if (!module && !selectedCountry) {
+                setSelectedRegion(null);
+            }
+
+            if (!selectedCountry) return;
+
+            const countryName = selectedCountry.country_name || selectedCountry.name;
+            if (!countryName) return;
+
+            let queryCountry = countryName;
+            const normalizedCountry = countryName.toLowerCase().trim();
+
+            if (normalizedCountry === 'uae' || normalizedCountry === 'united arab emirates') {
+                queryCountry = 'United Arab Emirates';
+            } else if (normalizedCountry === 'usa' || normalizedCountry === 'united states') {
+                queryCountry = 'United States';
+            } else if (normalizedCountry === 'uk' || normalizedCountry === 'united kingdom') {
+                queryCountry = 'United Kingdom';
+            }
+
+            try {
+                const res = await fetch('https://countriesnow.space/api/v0.1/countries/states', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ country: queryCountry })
+                });
+
+                if (!res.ok) throw new Error('API failed');
+
+                const data = await res.json();
+                if (data.data && data.data.states && data.data.states.length > 0) {
+                    setRegions(data.data.states.map(s => ({
+                        name: s.name,
+                        state_code: s.state_code
+                    })));
+                } else {
+                    // Fallback for UAE
+                    if (queryCountry === 'United Arab Emirates') {
+                        setRegions([
+                            { name: 'Abu Dhabi', state_code: 'AZ' },
+                            { name: 'Dubai', state_code: 'DU' },
+                            { name: 'Sharjah', state_code: 'SH' },
+                            { name: 'Ajman', state_code: 'AJ' },
+                            { name: 'Umm Al Quwain', state_code: 'UQ' },
+                            { name: 'Ras Al Khaimah', state_code: 'RK' },
+                            { name: 'Fujairah', state_code: 'FU' }
+                        ]);
+                    }
+                }
+            } catch (e) {
+                console.error('Fetch regions error', e);
+                // Fallback for UAE
+                if (queryCountry === 'United Arab Emirates') {
+                    setRegions([
+                        { name: 'Abu Dhabi', state_code: 'AZ' },
+                        { name: 'Dubai', state_code: 'DU' },
+                        { name: 'Sharjah', state_code: 'SH' },
+                        { name: 'Ajman', state_code: 'AJ' },
+                        { name: 'Umm Al Quwain', state_code: 'UQ' },
+                        { name: 'Ras Al Khaimah', state_code: 'RK' },
+                        { name: 'Fujairah', state_code: 'FU' }
+                    ]);
+                }
+            }
+        };
+
+        fetchRegions();
+    }, [selectedCountry?.id, selectedCountry?.country_name]); // Depend on ID to avoid loop if object ref changes
 
 
 
@@ -128,9 +223,11 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                 selected_name: selectedMaster.module_name,
                 is_active: status === 'ACTIVE',
                 country_id: selectedCountry?.id || null,
-                property_type_id: selectedPropertyType?.id || null,
-                premises_type_id: selectedType?.id || null,
-                area_id: selectedArea?.id || null,
+                property_type_id: currentModuleName?.toLowerCase().includes('vehicle') ? null : (selectedPropertyType?.id || null),
+                premises_type_id: currentModuleName?.toLowerCase().includes('vehicle') ? null : (selectedType?.id || null),
+                vehicle_usage_id: currentModuleName?.toLowerCase().includes('vehicle') ? (selectedType?.id || null) : null,
+                area_id: currentModuleName?.toLowerCase().includes('vehicle') ? null : (selectedArea?.id || null),
+                region: selectedRegion?.name || null,
                 status_id: status === 'ACTIVE' ? 1 : 2
             });
         } catch (err) {
@@ -151,19 +248,18 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                 onDismiss={onClose}
                 contentContainerStyle={styles.container}
             >
-                <View style={styles.header}>
+                <View style={[styles.header, { alignItems: 'flex-start' }]}>
                     <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <Text style={styles.title}>
-                                {viewOnly ? 'Module Details' : (module ? 'Edit Module Mapping' : 'Add Module')}
-                            </Text>
-                            {/* Section pills removed from here as they are now in the Detail Modal */}
-                        </View>
+                        <Text style={styles.title}>
+                            {viewOnly ? 'Module Details' : (module ? 'Edit Module Mapping' : 'Add Module')}
+                        </Text>
                         <Text style={styles.subtitle}>
                             {viewOnly ? 'Detailed configuration of this module' : 'Select a module and configure its fields'}
                         </Text>
                     </View>
-                    <IconButton icon="close" size={24} onPress={onClose} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <IconButton icon="close" size={26} onPress={onClose} iconColor="#64748b" style={{ margin: 0 }} />
+                    </View>
                 </View>
 
                 {/* Main Body */}
@@ -183,10 +279,11 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                                                 value={selectedMaster ? selectedMaster.module_name : ''}
                                                 placeholder="Select..."
                                                 editable={false}
-                                                style={{ backgroundColor: 'white' }}
+                                                style={{ backgroundColor: 'white', borderRadius: 12 }}
                                                 outlineColor="#e2e8f0"
-                                                activeOutlineColor="#3b82f6"
-                                                right={<TextInput.Icon icon="chevron-down" onPress={() => !viewOnly && setMenuVisible(true)} />}
+                                                activeOutlineColor="#673ab7"
+                                                outlineStyle={{ borderRadius: 12 }}
+                                                right={<TextInput.Icon icon="chevron-down" iconColor="#64748b" onPress={() => !viewOnly && setMenuVisible(true)} />}
                                                 pointerEvents="none"
                                             />
                                         </TouchableOpacity>
@@ -209,6 +306,12 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                                                     key={item.module_id}
                                                     onPress={() => {
                                                         setSelectedMaster(item);
+                                                        // Reset fields when module changes
+                                                        setSelectedCountry(null);
+                                                        setSelectedRegion(null);
+                                                        setSelectedPropertyType(null);
+                                                        setSelectedType(null);
+                                                        setSelectedArea(null);
                                                         setMenuVisible(false);
                                                         setSnackbarVisible(true);
                                                     }}
@@ -230,13 +333,67 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                                         <TouchableOpacity onPress={() => !viewOnly && setCountryMenu(true)}>
                                             <TextInput
                                                 mode="outlined"
-                                                value={selectedCountry ? (selectedCountry.name || selectedCountry.country_name) : ''}
+                                                value={selectedCountry ? (selectedCountry.isAll ? 'All' : (selectedCountry.country_name || selectedCountry.name)) : ''}
                                                 placeholder="Select Country"
                                                 editable={false}
-                                                style={{ backgroundColor: 'white' }}
+                                                style={{ backgroundColor: 'white', borderRadius: 12 }}
                                                 outlineColor="#e2e8f0"
-                                                activeOutlineColor="#3b82f6"
-                                                right={<TextInput.Icon icon="chevron-down" onPress={() => !viewOnly && setCountryMenu(true)} />}
+                                                activeOutlineColor="#673ab7"
+                                                outlineStyle={{ borderRadius: 12 }}
+                                                right={
+                                                    <TextInput.Icon
+                                                        icon="chevron-down"
+                                                        iconColor="#64748b"
+                                                        onPress={() => !viewOnly && setCountryMenu(true)}
+                                                    />
+                                                }
+                                            />
+                                        </TouchableOpacity>
+                                    }
+                                    contentStyle={styles.menuContent}
+                                >
+                                    <ScrollView style={{ maxHeight: 250 }}>
+                                        <Menu.Item
+                                            onPress={() => {
+                                                setSelectedCountry({ name: 'All', id: null, isAll: true });
+                                                setCountryMenu(false);
+                                            }}
+                                            title="All"
+                                        />
+                                        {countries
+                                            .filter(c => (c.country_name || c.name || '').toLowerCase() !== 'all')
+                                            .map((c, i) => (
+                                                <Menu.Item
+                                                    key={i}
+                                                    onPress={() => {
+                                                        setSelectedCountry(c);
+                                                        setCountryMenu(false);
+                                                    }}
+                                                    title={c.country_name || c.name}
+                                                />
+                                            ))}
+                                    </ScrollView>
+                                </Menu>
+                            </View>
+
+                            {/* Region Selection */}
+                            <View style={{ flex: 1.1, minWidth: 100 }}>
+                                <Text style={styles.label}>Region</Text>
+                                <Menu
+                                    visible={regionMenu}
+                                    onDismiss={() => setRegionMenu(false)}
+                                    anchor={
+                                        <TouchableOpacity onPress={() => !viewOnly && setRegionMenu(true)}>
+                                            <TextInput
+                                                mode="outlined"
+                                                value={selectedRegion ? (selectedRegion.isAll ? 'All' : selectedRegion.name) : ''}
+                                                placeholder="Select Region"
+                                                editable={false}
+                                                style={{ backgroundColor: 'white', borderRadius: 12 }}
+                                                outlineColor="#e2e8f0"
+                                                activeOutlineColor="#673ab7"
+                                                outlineStyle={{ borderRadius: 12 }}
+                                                right={<TextInput.Icon icon="chevron-down" iconColor="#64748b" onPress={() => !viewOnly && setRegionMenu(true)} />}
                                                 pointerEvents="none"
                                             />
                                         </TouchableOpacity>
@@ -244,135 +401,233 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                                     contentStyle={styles.menuContent}
                                 >
                                     <ScrollView style={{ maxHeight: 250 }}>
-                                        {countries.map((c, i) => (
+                                        {selectedCountry?.isAll && (
                                             <Menu.Item
-                                                key={i}
                                                 onPress={() => {
-                                                    setSelectedCountry(c);
-                                                    setCountryMenu(false);
+                                                    setSelectedRegion({ name: 'All', id: null, isAll: true });
+                                                    setRegionMenu(false);
                                                 }}
-                                                title={c.country_name || c.name}
+                                                title="All"
                                             />
-                                        ))}
+                                        )}
+                                        {regions.length > 0 ? (
+                                            regions
+                                                .filter(r => (r.name || r.label || '').toLowerCase() !== 'all')
+                                                .map((r, i) => (
+                                                    <Menu.Item
+                                                        key={i}
+                                                        onPress={() => {
+                                                            setSelectedRegion(r);
+                                                            setRegionMenu(false);
+                                                        }}
+                                                        title={r.name}
+                                                    />
+                                                ))
+                                        ) : (
+                                            <Menu.Item title={selectedCountry ? "No regions found" : "Select Country first"} disabled />
+                                        )}
                                     </ScrollView>
                                 </Menu>
                             </View>
 
-                            {/* Property Type Selection */}
-                            <View style={{ flex: 1.1, minWidth: 100 }}>
-                                <Text style={styles.label}>Property Type</Text>
-                                <Menu
-                                    visible={ownershipMenu}
-                                    onDismiss={() => setOwnershipMenu(false)}
-                                    anchor={
-                                        <TouchableOpacity onPress={() => !viewOnly && setOwnershipMenu(true)}>
-                                            <TextInput
-                                                mode="outlined"
-                                                value={selectedPropertyType ? selectedPropertyType.name : ''}
-                                                placeholder="Select Property Type"
-                                                editable={false}
-                                                style={{ backgroundColor: 'white' }}
-                                                outlineColor="#e2e8f0"
-                                                activeOutlineColor="#3b82f6"
-                                                right={<TextInput.Icon icon="chevron-down" onPress={() => !viewOnly && setOwnershipMenu(true)} />}
-                                                pointerEvents="none"
-                                            />
-                                        </TouchableOpacity>
-                                    }
-                                    contentStyle={styles.menuContent}
-                                >
-                                    {propertyTypes.length > 0 ? (
-                                        propertyTypes.map((pt, i) => (
+                            {/* Conditional Rendering based on Module Name */}
+                            {currentModuleName?.toLowerCase().includes('vehicle') ? (
+                                <>
+                                    {/* Vehicle Usage Selection */}
+                                    <View style={{ flex: 1.5 }}>
+                                        <Text style={styles.label}>Usage</Text>
+                                        <Menu
+                                            visible={typeMenu}
+                                            onDismiss={() => setTypeMenu(false)}
+                                            anchor={
+                                                <TouchableOpacity onPress={() => !viewOnly && setTypeMenu(true)}>
+                                                    <TextInput
+                                                        mode="outlined"
+                                                        value={selectedType ? (selectedType.isAll ? 'All' : (selectedType.type_name || selectedType.name)) : ''}
+                                                        placeholder="Select Usage"
+                                                        editable={false}
+                                                        style={{ backgroundColor: 'white', borderRadius: 12 }}
+                                                        outlineColor="#e2e8f0"
+                                                        activeOutlineColor="#673ab7"
+                                                        outlineStyle={{ borderRadius: 12 }}
+                                                        right={<TextInput.Icon icon="chevron-down" iconColor="#64748b" onPress={() => !viewOnly && setTypeMenu(true)} />}
+                                                        pointerEvents="none"
+                                                    />
+                                                </TouchableOpacity>
+                                            }
+                                            contentStyle={styles.menuContent}
+                                        >
+                                            <ScrollView style={{ maxHeight: 250 }}>
+                                                <Menu.Item
+                                                    onPress={() => {
+                                                        setSelectedType({ type_name: 'All', id: null, isAll: true });
+                                                        setTypeMenu(false);
+                                                    }}
+                                                    title="All"
+                                                />
+                                                {vehicleUsages.map((t, i) => (
+                                                    <Menu.Item
+                                                        key={i}
+                                                        onPress={() => {
+                                                            setSelectedType({ ...t, type_name: t.name });
+                                                            setTypeMenu(false);
+                                                        }}
+                                                        title={t.name}
+                                                    />
+                                                ))}
+                                            </ScrollView>
+                                        </Menu>
+                                    </View>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Property Type Selection */}
+                                    <View style={{ flex: 1.1, minWidth: 100 }}>
+                                        <Text style={styles.label}>Property Type</Text>
+                                        <Menu
+                                            visible={ownershipMenu}
+                                            onDismiss={() => setOwnershipMenu(false)}
+                                            anchor={
+                                                <TouchableOpacity onPress={() => !viewOnly && setOwnershipMenu(true)}>
+                                                    <TextInput
+                                                        mode="outlined"
+                                                        value={selectedPropertyType ? (selectedPropertyType.isAll ? 'All' : selectedPropertyType.name) : ''}
+                                                        placeholder="Select Property Type"
+                                                        editable={false}
+                                                        style={{ backgroundColor: 'white', borderRadius: 12 }}
+                                                        outlineColor="#e2e8f0"
+                                                        activeOutlineColor="#673ab7"
+                                                        outlineStyle={{ borderRadius: 12 }}
+                                                        right={<TextInput.Icon icon="chevron-down" iconColor="#64748b" onPress={() => !viewOnly && setOwnershipMenu(true)} />}
+                                                        pointerEvents="none"
+                                                    />
+                                                </TouchableOpacity>
+                                            }
+                                            contentStyle={styles.menuContent}
+                                        >
                                             <Menu.Item
-                                                key={pt.id || i}
                                                 onPress={() => {
-                                                    setSelectedPropertyType(pt);
+                                                    setSelectedPropertyType({ name: 'All', id: null, isAll: true });
                                                     setOwnershipMenu(false);
                                                 }}
-                                                title={pt.name}
+                                                title="All"
                                             />
-                                        ))
-                                    ) : (
-                                        <Menu.Item title="No types loaded" disabled />
-                                    )}
-                                </Menu>
-                            </View>
+                                            {propertyTypes.length > 0 ? (
+                                                propertyTypes
+                                                    .filter(pt => (pt.name || '').toLowerCase() !== 'all')
+                                                    .map((pt, i) => (
+                                                        <Menu.Item
+                                                            key={pt.id || i}
+                                                            onPress={() => {
+                                                                setSelectedPropertyType(pt);
+                                                                setOwnershipMenu(false);
+                                                            }}
+                                                            title={pt.name}
+                                                        />
+                                                    ))
+                                            ) : (
+                                                <Menu.Item title="No types loaded" disabled />
+                                            )}
+                                        </Menu>
+                                    </View>
 
-                            {/* Premise Type Selection */}
-                            <View style={{ flex: 1.5 }}>
-                                <Text style={styles.label}>Premise Type</Text>
-                                <Menu
-                                    visible={typeMenu}
-                                    onDismiss={() => setTypeMenu(false)}
-                                    anchor={
-                                        <TouchableOpacity onPress={() => !viewOnly && setTypeMenu(true)}>
-                                            <TextInput
-                                                mode="outlined"
-                                                value={selectedType ? selectedType.type_name : ''}
-                                                placeholder="Select Premises Type"
-                                                editable={false}
-                                                style={{ backgroundColor: 'white' }}
-                                                outlineColor="#e2e8f0"
-                                                activeOutlineColor="#3b82f6"
-                                                right={<TextInput.Icon icon="chevron-down" onPress={() => !viewOnly && setTypeMenu(true)} />}
-                                                pointerEvents="none"
-                                            />
-                                        </TouchableOpacity>
-                                    }
-                                    contentStyle={styles.menuContent}
-                                >
-                                    <ScrollView style={{ maxHeight: 250 }}>
-                                        {premisesTypes.map((t, i) => (
-                                            <Menu.Item
-                                                key={i}
-                                                onPress={() => {
-                                                    setSelectedType(t);
-                                                    setTypeMenu(false);
-                                                }}
-                                                title={t.type_name}
-                                            />
-                                        ))}
-                                    </ScrollView>
-                                </Menu>
-                            </View>
+                                    {/* Premise Type Selection */}
+                                    <View style={{ flex: 1.5 }}>
+                                        <Text style={styles.label}>Premise Type</Text>
+                                        <Menu
+                                            visible={typeMenu}
+                                            onDismiss={() => setTypeMenu(false)}
+                                            anchor={
+                                                <TouchableOpacity onPress={() => !viewOnly && setTypeMenu(true)}>
+                                                    <TextInput
+                                                        mode="outlined"
+                                                        value={selectedType ? (selectedType.isAll ? 'All' : selectedType.type_name) : ''}
+                                                        placeholder="Select Premises Type"
+                                                        editable={false}
+                                                        style={{ backgroundColor: 'white', borderRadius: 12 }}
+                                                        outlineColor="#e2e8f0"
+                                                        activeOutlineColor="#673ab7"
+                                                        outlineStyle={{ borderRadius: 12 }}
+                                                        right={<TextInput.Icon icon="chevron-down" iconColor="#64748b" onPress={() => !viewOnly && setTypeMenu(true)} />}
+                                                        pointerEvents="none"
+                                                    />
+                                                </TouchableOpacity>
+                                            }
+                                            contentStyle={styles.menuContent}
+                                        >
+                                            <ScrollView style={{ maxHeight: 250 }}>
+                                                <Menu.Item
+                                                    onPress={() => {
+                                                        setSelectedType({ type_name: 'All', id: null, isAll: true });
+                                                        setTypeMenu(false);
+                                                    }}
+                                                    title="All"
+                                                />
+                                                {premisesTypes
+                                                    .filter(t => (t.type_name || '').toLowerCase() !== 'all')
+                                                    .map((t, i) => (
+                                                        <Menu.Item
+                                                            key={i}
+                                                            onPress={() => {
+                                                                setSelectedType(t);
+                                                                setTypeMenu(false);
+                                                            }}
+                                                            title={t.type_name}
+                                                        />
+                                                    ))}
+                                            </ScrollView>
+                                        </Menu>
+                                    </View>
 
-                            {/* Area Selection */}
-                            <View style={{ flex: 1.5 }}>
-                                <Text style={styles.label}>Area</Text>
-                                <Menu
-                                    visible={areaMenu}
-                                    onDismiss={() => setAreaMenu(false)}
-                                    anchor={
-                                        <TouchableOpacity onPress={() => !viewOnly && setAreaMenu(true)}>
-                                            <TextInput
-                                                mode="outlined"
-                                                value={selectedArea ? selectedArea.name : ''}
-                                                placeholder="Select Area"
-                                                editable={false}
-                                                style={{ backgroundColor: 'white' }}
-                                                outlineColor="#e2e8f0"
-                                                activeOutlineColor="#3b82f6"
-                                                right={<TextInput.Icon icon="chevron-down" onPress={() => !viewOnly && setAreaMenu(true)} />}
-                                                pointerEvents="none"
-                                            />
-                                        </TouchableOpacity>
-                                    }
-                                    contentStyle={styles.menuContent}
-                                >
-                                    <ScrollView style={{ maxHeight: 250 }}>
-                                        {areas.map((a, i) => (
-                                            <Menu.Item
-                                                key={i}
-                                                onPress={() => {
-                                                    setSelectedArea(a);
-                                                    setAreaMenu(false);
-                                                }}
-                                                title={a.name}
-                                            />
-                                        ))}
-                                    </ScrollView>
-                                </Menu>
-                            </View>
+                                    {/* Area Selection */}
+                                    <View style={{ flex: 1.5 }}>
+                                        <Text style={styles.label}>Area</Text>
+                                        <Menu
+                                            visible={areaMenu}
+                                            onDismiss={() => setAreaMenu(false)}
+                                            anchor={
+                                                <TouchableOpacity onPress={() => !viewOnly && setAreaMenu(true)}>
+                                                    <TextInput
+                                                        mode="outlined"
+                                                        value={selectedArea ? (selectedArea.isAll ? 'All' : selectedArea.name) : ''}
+                                                        placeholder="Select Area"
+                                                        editable={false}
+                                                        style={{ backgroundColor: 'white', borderRadius: 12 }}
+                                                        outlineColor="#e2e8f0"
+                                                        activeOutlineColor="#673ab7"
+                                                        outlineStyle={{ borderRadius: 12 }}
+                                                        right={<TextInput.Icon icon="chevron-down" iconColor="#64748b" onPress={() => !viewOnly && setAreaMenu(true)} />}
+                                                        pointerEvents="none"
+                                                    />
+                                                </TouchableOpacity>
+                                            }
+                                            contentStyle={styles.menuContent}
+                                        >
+                                            <ScrollView style={{ maxHeight: 250 }}>
+                                                <Menu.Item
+                                                    onPress={() => {
+                                                        setSelectedArea({ name: 'All', id: null, isAll: true });
+                                                        setAreaMenu(false);
+                                                    }}
+                                                    title="All"
+                                                />
+                                                {areas
+                                                    .filter(a => (a.name || '').toLowerCase() !== 'all')
+                                                    .map((a, i) => (
+                                                        <Menu.Item
+                                                            key={i}
+                                                            onPress={() => {
+                                                                setSelectedArea(a);
+                                                                setAreaMenu(false);
+                                                            }}
+                                                            title={a.name}
+                                                        />
+                                                    ))}
+                                            </ScrollView>
+                                        </Menu>
+                                    </View>
+                                </>
+                            )}
 
                             <View style={{ flex: 0.8, alignItems: 'flex-end', marginTop: 28 }}>
                                 <View style={styles.statusBadge}>
@@ -380,7 +635,7 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                                     <Switch
                                         value={status === 'ACTIVE'}
                                         onValueChange={(val) => !viewOnly && setStatus(val ? 'ACTIVE' : 'INACTIVE')}
-                                        color="#3b82f6"
+                                        color="#10b981"
                                         disabled={viewOnly}
                                     />
                                 </View>
@@ -388,31 +643,30 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
                         </View>
                     )}
 
-                    <View style={styles.builderContainer}><FieldBuilderPanel moduleId={currentMasterId} moduleName={currentModuleName} readOnly={viewOnly} initialSectionName={initialSection} /></View>
+                    <View style={styles.builderContainer}>
+                        <FieldBuilderPanel
+                            moduleId={currentMasterId}
+                            moduleName={currentModuleName}
+                            readOnly={viewOnly}
+                            initialSectionName={initialSection}
+                            onClose={onClose}
+                        />
+                    </View>
                 </View>
 
-                <View style={styles.footer}>
-                    <Button
-                        mode="text"
-                        onPress={onClose}
-                        textColor="#64748b"
-                        style={styles.footerBtn}
-                        labelStyle={{ fontWeight: '600' }}
-                    >
-                        Close
-                    </Button>
-                    <Button
-                        mode="contained"
-                        onPress={handleSave}
-                        loading={loading}
-                        style={styles.saveBtn}
-                        contentStyle={{ height: 44, paddingHorizontal: 16 }}
-                        labelStyle={{ fontSize: 15, fontWeight: '700' }}
-                        disabled={viewOnly}
-                    >
-                        {module ? 'Save Module Settings' : 'Enable Module'}
-                    </Button>
-                </View>
+                {viewOnly && (
+                    <View style={styles.footer}>
+                        <Button
+                            mode="outlined"
+                            onPress={onClose}
+                            textColor="#3b82f6"
+                            style={styles.modalCancelBtn}
+                            labelStyle={{ fontWeight: '700', fontSize: 15 }}
+                        >
+                            Close
+                        </Button>
+                    </View>
+                )}
 
             </Modal>
             <Snackbar
@@ -430,32 +684,36 @@ const ModuleFormModal = ({ visible, onClose, onSave, module = null, viewOnly = f
 const styles = StyleSheet.create({
     container: {
         backgroundColor: 'white',
-        margin: 20,
-        borderRadius: 16,
+        borderRadius: 24,
         width: '95%',
         maxWidth: 1100,
-        height: '90%',
+        height: '92%',
         alignSelf: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.1,
+        shadowRadius: 30,
+        elevation: 10,
         overflow: 'hidden',
-        flex: 1,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
         paddingHorizontal: 32,
-        paddingVertical: 20,
+        paddingTop: 32,
+        paddingBottom: 24,
         borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
+        borderBottomColor: '#f1f5f9',
     },
     title: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '700',
-        color: '#0f172a',
+        color: '#1e293b',
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 14,
-        color: '#64748b',
+        color: '#94a3b8',
         marginTop: 4,
     },
     sectionPill: {
@@ -521,6 +779,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         width: 400,
         marginTop: 48,
+        borderRadius: 12,
+        elevation: 8,
     },
     searchBar: {
         margin: 8,
@@ -558,11 +818,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'flex-end',
         alignItems: 'center',
-        padding: 20,
+        paddingHorizontal: 32,
+        paddingVertical: 24,
         borderTopWidth: 1,
         borderTopColor: '#f1f5f9',
-        backgroundColor: '#f8fafc',
-        gap: 12,
+        backgroundColor: 'white',
+    },
+    modalCancelBtn: {
+        borderRadius: 100,
+        paddingHorizontal: 24,
+        borderColor: '#e2e8f0',
+        height: 48,
+        justifyContent: 'center',
     },
     footerBtn: {
         marginRight: 8,

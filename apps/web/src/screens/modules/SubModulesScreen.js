@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, useWindowDimensions, TextInput } from 'react-native';
 import AppLayout from '../../components/AppLayout';
-import { Card, Title, Button, Portal, Modal, ActivityIndicator, Checkbox, DataTable } from 'react-native-paper';
+import { Card, Title, Button, Portal, Modal, ActivityIndicator, Checkbox, DataTable, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../../api/client';
 import AlertDialog from '../../components/AlertDialog';
@@ -24,6 +24,7 @@ const SubModulesScreen = ({ navigation }) => {
     const [propertyTypes, setPropertyTypes] = useState([]);
     const [areas, setAreas] = useState([]);
     const [types, setTypes] = useState([]);
+    const [vehicleUsages, setVehicleUsages] = useState([]);
 
     // List State
     const [companyModules, setCompanyModules] = useState([]);
@@ -34,6 +35,8 @@ const SubModulesScreen = ({ navigation }) => {
     const [selectedPropertyType, setSelectedPropertyType] = useState(null);
     const [selectedType, setSelectedType] = useState(null);
     const [selectedArea, setSelectedArea] = useState(null);
+    const [selectedRegion, setSelectedRegion] = useState(null);
+    const [regions, setRegions] = useState([]);
     const [status, setStatus] = useState(true);
 
     // Structure Data
@@ -55,6 +58,7 @@ const SubModulesScreen = ({ navigation }) => {
     const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info' });
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
+    const [wizardStep, setWizardStep] = useState(1);
 
     const handleOpenModal = () => {
         setEditingId(null);
@@ -63,26 +67,30 @@ const SubModulesScreen = ({ navigation }) => {
         setSelectedPropertyType(null);
         setSelectedType(null);
         setSelectedArea(null);
+        setSelectedRegion(null);
         setStatus(true);
         setModuleSections([]);
         setSectionFields({});
         setExpandedSectionId(null);
         setSelectedFields({});
+        setWizardStep(1);
         setModalVisible(true);
     };
 
     const handleEdit = (item) => {
         setEditingId(item.id);
         const mod = modules.find(m => m.module_id === item.module_id || m.id === item.module_id);
-        const country = countries.find(c => c.id === item.country_id);
-        const propType = propertyTypes.find(pt => pt.id === item.property_type_id);
-        const type = types.find(t => t.id === item.premises_type_id);
-        const area = areas.find(a => a.id === item.area_id);
+        const country = countries.find(c => c.id === item.country_id) || (item.country_id === null ? { country_name: 'All', id: null, isAll: true } : null);
+        const propType = propertyTypes.find(pt => pt.id === item.property_type_id) || (item.property_type_id === null ? { name: 'All', id: null, isAll: true } : null);
+        const type = types.find(t => t.id === item.premises_type_id) || (item.premises_type_id === null ? { type_name: 'All', id: null, isAll: true } : null);
+        const area = areas.find(a => a.id === item.area_id) || (item.area_id === null ? { name: 'All', id: null, isAll: true } : null);
+
         setSelectedModule(mod || null);
-        setSelectedCountry(country || null);
-        setSelectedPropertyType(propType || null);
-        setSelectedType(type || null);
-        setSelectedArea(area || null);
+        setSelectedCountry(country);
+        setSelectedPropertyType(propType);
+        setSelectedType(type || (item.premises_type_id === null && item.vehicle_usage_id ? vehicleUsages.find(vu => vu.id === item.vehicle_usage_id) : null));
+        setSelectedArea(area);
+        setSelectedRegion(item.region ? { name: item.region } : { name: 'All', id: null, isAll: true });
         setStatus(item.is_active === 1 || item.status === 'ACTIVE');
 
         // Populate selected fields from item.selected_fields
@@ -105,7 +113,7 @@ const SubModulesScreen = ({ navigation }) => {
         // alert(`Debug Edit:\nLoaded Count: ${Object.keys(fieldsState).length}\nIDs: ${JSON.stringify(Object.keys(fieldsState))}`);
 
         setSelectedFields(fieldsState);
-
+        setWizardStep(1);
         setModalVisible(true);
     };
 
@@ -137,6 +145,94 @@ const SubModulesScreen = ({ navigation }) => {
         fetchCompanyModules();
     }, []);
 
+    // Fetch regions when country changes
+    useEffect(() => {
+        const fetchRegions = async () => {
+            setRegions([]);
+            // Don't reset selectedRegion if we are in edit mode and just loaded the data
+            if (!editingId && !selectedCountry) {
+                setSelectedRegion(null);
+            }
+
+            if (selectedCountry?.isAll) {
+                setRegions([]);
+                if (!editingId) {
+                    setSelectedRegion({ name: 'All', id: null, isAll: true });
+                    setSelectedArea({ name: 'All', id: null, isAll: true });
+                }
+                return;
+            }
+
+            if (!selectedCountry) {
+                setRegions([]);
+                return;
+            }
+
+            const countryName = selectedCountry.country_name || selectedCountry.name;
+            if (!countryName || countryName === 'All') return;
+
+            let queryCountry = countryName;
+            const normalizedCountry = countryName.toLowerCase().trim();
+
+            // Normalize common country names for the API
+            if (normalizedCountry === 'uae' || normalizedCountry === 'united arab emirates') {
+                queryCountry = 'United Arab Emirates';
+            } else if (normalizedCountry === 'usa' || normalizedCountry === 'united states') {
+                queryCountry = 'United States';
+            } else if (normalizedCountry === 'uk' || normalizedCountry === 'united kingdom') {
+                queryCountry = 'United Kingdom';
+            }
+
+            try {
+                const res = await fetch('https://countriesnow.space/api/v0.1/countries/states', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ country: queryCountry })
+                });
+
+                if (!res.ok) throw new Error('API request failed');
+
+                const data = await res.json();
+                if (data.data && data.data.states && data.data.states.length > 0) {
+                    setRegions(data.data.states.map(s => ({
+                        name: s.name,
+                        state_code: s.state_code
+                    })));
+                } else {
+                    // Fallback for UAE if API fails or returns empty
+                    if (queryCountry === 'United Arab Emirates') {
+                        const uaeStates = [
+                            { name: 'Abu Dhabi', state_code: 'AZ' },
+                            { name: 'Dubai', state_code: 'DU' },
+                            { name: 'Sharjah', state_code: 'SH' },
+                            { name: 'Ajman', state_code: 'AJ' },
+                            { name: 'Umm Al Quwain', state_code: 'UQ' },
+                            { name: 'Ras Al Khaimah', state_code: 'RK' },
+                            { name: 'Fujairah', state_code: 'FU' }
+                        ];
+                        setRegions(uaeStates);
+                    }
+                }
+            } catch (e) {
+                console.error('Fetch regions error', e);
+                // Fallback for UAE on Error
+                if (queryCountry === 'United Arab Emirates') {
+                    setRegions([
+                        { name: 'Abu Dhabi', state_code: 'AZ' },
+                        { name: 'Dubai', state_code: 'DU' },
+                        { name: 'Sharjah', state_code: 'SH' },
+                        { name: 'Ajman', state_code: 'AJ' },
+                        { name: 'Umm Al Quwain', state_code: 'UQ' },
+                        { name: 'Ras Al Khaimah', state_code: 'RK' },
+                        { name: 'Fujairah', state_code: 'FU' }
+                    ]);
+                }
+            }
+        };
+
+        fetchRegions();
+    }, [selectedCountry?.id, selectedCountry?.country_name]); // Added country_name as dependency for robustness
+
     useEffect(() => {
         if (!modalVisible) {
             fetchCompanyModules();
@@ -160,20 +256,35 @@ const SubModulesScreen = ({ navigation }) => {
     const fetchInitialData = async () => {
         try {
             setLoadingData(true);
-            const [modRes, countriesRes, propRes, areasRes, typesRes] = await Promise.all([
-                api.get('module-master'),
-                api.get('countries'),
-                api.get('property-types'),
-                api.get('areas'),
-                api.get('premises-types')
-            ]);
-            if (modRes.data.success) setModules(modRes.data.data);
-            if (countriesRes.data.success) setCountries(countriesRes.data.data);
-            if (propRes.data.success) setPropertyTypes(propRes.data.data);
-            if (areasRes.data.success) setAreas(areasRes.data.data);
-            if (typesRes.data.success) setTypes(typesRes.data.data);
+            // Fetch each independently so one failure doesn't block others
+            api.get('module-master').then(res => {
+                if (res.data?.success) setModules(res.data.data);
+            }).catch(e => console.error('Error fetching module-master:', e));
+
+            api.get('countries').then(res => {
+                if (res.data?.success) setCountries(res.data.data);
+            }).catch(e => console.error('Error fetching countries:', e));
+
+            api.get('property-types').then(res => {
+                if (res.data?.success) setPropertyTypes(res.data.data);
+            }).catch(e => console.error('Error fetching property-types:', e));
+
+            api.get('areas').then(res => {
+                if (res.data?.success || Array.isArray(res.data)) {
+                    setAreas(res.data.data || res.data);
+                }
+            }).catch(e => console.error('Error fetching areas:', e));
+
+            api.get('premises-types').then(res => {
+                if (res.data?.success) setTypes(res.data.data);
+            }).catch(e => console.error('Error fetching premises-types:', e));
+
+            api.get('vehicle-usage').then(res => {
+                if (res.data?.success) setVehicleUsages(res.data.data);
+            }).catch(e => console.error('Error fetching vehicle-usage:', e));
+
         } catch (error) {
-            console.error('Fetch data error:', error);
+            console.error('Fetch data launcher error:', error);
         } finally {
             setLoadingData(false);
         }
@@ -255,10 +366,12 @@ const SubModulesScreen = ({ navigation }) => {
 
             const payload = {
                 module_id: selectedModule.module_id || selectedModule.id,
-                country_id: selectedCountry?.id || null,
-                property_type_id: selectedPropertyType?.id || null,
-                premises_type_id: selectedType?.id || null,
-                area_id: selectedArea?.id || null,
+                country_id: (selectedCountry && !selectedCountry.isAll) ? selectedCountry.id : null,
+                property_type_id: (selectedPropertyType && !selectedPropertyType.isAll) ? selectedPropertyType.id : null,
+                premises_type_id: (!selectedModule?.module_name?.toLowerCase().includes('vehicle') && selectedType && !selectedType.isAll) ? selectedType.id : null,
+                vehicle_usage_id: (selectedModule?.module_name?.toLowerCase().includes('vehicle') && selectedType && !selectedType.isAll) ? selectedType.id : null,
+                area_id: (selectedArea && !selectedArea.isAll) ? selectedArea.id : null,
+                region: (selectedRegion && !selectedRegion.isAll) ? (selectedRegion.name || selectedRegion.label) : null,
                 is_active: status,
                 status_id: status ? 1 : 2,
                 selected_fields: selectedFieldIds
@@ -299,41 +412,120 @@ const SubModulesScreen = ({ navigation }) => {
         }
     };
 
-    const renderDropdown = (label, placeholder, value, options, onSelect, key, labelKey = 'name', containerStyle = {}) => {
+    const renderDropdown = (label, placeholder, value, options, onSelect, key, labelKey = 'name', containerStyle = {}, showAll = true, multi = false) => {
         const isOpen = dropdownOpen === key;
+
+        const renderSelectedValue = () => {
+            if (!value || (Array.isArray(value) && value.length === 0)) {
+                return <Text style={styles.placeholderText}>{placeholder}</Text>;
+            }
+
+            if (Array.isArray(value)) {
+                return (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                        {value.map((v, i) => (
+                            <Chip key={i} style={{ height: 26, backgroundColor: '#e0e7ff' }} textStyle={{ fontSize: 11, color: '#4338ca' }}>
+                                {v.isAll ? 'All' : (v[labelKey] || v.label || v.name || 'Unknown')}
+                            </Chip>
+                        ))}
+                    </View>
+                );
+            }
+
+            return (
+                <Chip
+                    style={{
+                        height: 30,
+                        backgroundColor: value.isAll ? '#f1f5f9' : '#eff6ff',
+                        borderColor: value.isAll ? '#e2e8f0' : '#bfdbfe',
+                        borderWidth: 1
+                    }}
+                    textStyle={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: value.isAll ? '#475569' : '#1e40af'
+                    }}
+                    compact
+                >
+                    {value.isAll ? 'All' : (value[labelKey] || value.label || value.name || 'Selected')}
+                </Chip>
+            );
+        };
+
         return (
             <View style={[styles.inputContainer, containerStyle, { zIndex: isOpen ? 1000 : 1 }]}>
-                <Text style={styles.inputLabel}>{label}</Text>
+                {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
                 <TouchableOpacity
-                    style={[styles.dropdownTrigger, isOpen && styles.dropdownTriggerActive]}
+                    style={[
+                        styles.dropdownTrigger,
+                        isOpen && styles.dropdownTriggerActive,
+                        { height: 'auto', minHeight: 48, paddingVertical: 4 }
+                    ]}
                     onPress={() => toggleDropdown(key)}
                 >
-                    <Text style={[styles.dropdownText, !value && styles.placeholderText]} numberOfLines={1}>
-                        {value ? value[labelKey] || value.label || value.name : placeholder}
-                    </Text>
-                    <MaterialCommunityIcons name="chevron-down" size={20} color="#64748b" />
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                        {renderSelectedValue()}
+                    </View>
+                    <MaterialCommunityIcons name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#64748b" />
                 </TouchableOpacity>
 
                 {isOpen && (
                     <View style={styles.dropdownList}>
-                        {options.length === 0 ? (
-                            <Text style={{ padding: 12, color: '#94a3b8' }}>No options</Text>
-                        ) : (
-                            <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled={true}>
-                                {options.map((opt, idx) => (
-                                    <TouchableOpacity
-                                        key={idx}
-                                        style={styles.dropdownItem}
-                                        onPress={() => {
-                                            onSelect(opt);
-                                            setDropdownOpen(null);
-                                        }}
-                                    >
-                                        <Text style={styles.dropdownItemText}>{opt[labelKey] || opt.label || opt.name}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        )}
+                        <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled={true}>
+                            {showAll && (
+                                <TouchableOpacity
+                                    style={[styles.dropdownItem, { backgroundColor: (value?.isAll || (value && (value[labelKey] || value.name || '').toLowerCase() === 'all')) ? '#f8fafc' : 'transparent' }]}
+                                    onPress={() => {
+                                        onSelect({ [labelKey]: 'All', id: null, isAll: true });
+                                        setDropdownOpen(null);
+                                    }}
+                                >
+                                    <Text style={[styles.dropdownItemText, (value?.isAll || (value && (value[labelKey] || value.name || '').toLowerCase() === 'all')) && { color: '#673ab7', fontWeight: 'bold' }]}>All</Text>
+                                    {(value?.isAll || (value && (value[labelKey] || value.name || '').toLowerCase() === 'all')) && <MaterialCommunityIcons name="check" size={16} color="#673ab7" />}
+                                </TouchableOpacity>
+                            )}
+
+                            {options.length === 0 ? (
+                                !showAll && <Text style={{ padding: 12, color: '#94a3b8' }}>No options available</Text>
+                            ) : (
+                                options
+                                    .filter(opt => {
+                                        const l = (opt[labelKey] || opt.label || opt.name || '').toLowerCase();
+                                        return l !== 'all';
+                                    })
+                                    .map((opt, idx) => {
+                                        const isSelected = Array.isArray(value)
+                                            ? value.find(v => (v.id === opt.id || v.module_id === opt.id))
+                                            : (value?.id === opt.id || (opt.module_id && value?.module_id === opt.module_id));
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={`opt-${idx}-${opt.id || idx}`}
+                                                style={[styles.dropdownItem, isSelected && { backgroundColor: '#f5f3ff' }, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                                                onPress={() => {
+                                                    if (multi) {
+                                                        const current = Array.isArray(value) ? value : [];
+                                                        const exists = current.find(v => v.id === opt.id);
+                                                        if (exists) {
+                                                            onSelect(current.filter(v => v.id !== opt.id));
+                                                        } else {
+                                                            onSelect([...current, opt]);
+                                                        }
+                                                    } else {
+                                                        onSelect(opt);
+                                                        setDropdownOpen(null);
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={[styles.dropdownItemText, isSelected && { color: '#673ab7', fontWeight: 'bold' }]}>
+                                                    {opt[labelKey] || opt.label || opt.name}
+                                                </Text>
+                                                {isSelected && <MaterialCommunityIcons name="check" size={16} color="#673ab7" />}
+                                            </TouchableOpacity>
+                                        );
+                                    })
+                            )}
+                        </ScrollView>
                     </View>
                 )}
             </View>
@@ -377,19 +569,19 @@ const SubModulesScreen = ({ navigation }) => {
                                 <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#94a3b8" />
                                 <Text style={{ color: '#94a3b8', marginTop: 8 }}>No sections found for this module.</Text>
                             </View>
-                        ) : moduleSections.map((section) => {
+                        ) : moduleSections.map((section, sidx) => {
                             const isExpanded = expandedSectionId === section.id;
                             const fields = sectionFields[section.id] || [];
                             return (
-                                <View key={section.id} style={styles.accordionContainer}>
+                                <View key={`section-${section.id}-${sidx}`} style={styles.accordionContainer}>
                                     <TouchableOpacity style={styles.accordionHeader} onPress={() => handleSectionPress(section.id)}>
                                         <Text style={styles.accordionTitle}>{section.name}</Text>
                                         <MaterialCommunityIcons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} />
                                     </TouchableOpacity>
                                     {isExpanded && (
                                         <View style={styles.accordionContent}>
-                                            {fields.map(field => (
-                                                <TouchableOpacity key={field.id} style={styles.fieldItem} onPress={() => toggleFieldSelection(field.id)}>
+                                            {fields.map((field, fidx) => (
+                                                <TouchableOpacity key={`field-${field.id}-${fidx}`} style={styles.fieldItem} onPress={() => toggleFieldSelection(field.id)}>
                                                     <Checkbox.Android status={selectedFields[field.id] ? 'checked' : 'unchecked'} color="#673ab7" />
                                                     <Text>{field.label}</Text>
                                                 </TouchableOpacity>
@@ -442,7 +634,7 @@ const SubModulesScreen = ({ navigation }) => {
                 {/* Filter Header */}
                 <View style={{ marginBottom: 16 }}>
                     <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 8, color: '#000' }}>Filter by Module</Text>
-                    {renderDropdown("", "Show all...", filterModule, modules, setFilterModule, 'filterMod', 'module_name', { width: '100%', backgroundColor: '#fff' })}
+                    {renderDropdown("", "Select Module", filterModule, modules, setFilterModule, 'filterMod', 'module_name', { width: '100%', backgroundColor: '#fff' }, false)}
                 </View>
 
                 {/* Table */}
@@ -459,12 +651,13 @@ const SubModulesScreen = ({ navigation }) => {
                             <>
                                 {isMobile ? (
                                     <ScrollView style={{ maxHeight: 'calc(100vh - 350px)', padding: 12 }}>
-                                        {paginatedItems.map((item) => {
-                                            const isPremisesItem = filterModule?.module_name === 'Premises' || item.module_name === 'Premises' || item.module_name === 'Office Premises';
+                                        {paginatedItems.map((item, idx) => {
+                                            const isVehicleItem = filterModule?.module_name?.toLowerCase().includes('vehicle') || item.module_name?.toLowerCase().includes('vehicle');
+                                            const isPremisesItem = filterModule?.module_name === 'Premises' || item.module_name === 'Premises' || item.module_name === 'Office Premises' || isVehicleItem;
 
                                             if (isPremisesItem) {
                                                 return (
-                                                    <View key={item.id} style={{
+                                                    <View key={`mobile-prem-${item.id}-${idx}`} style={{
                                                         backgroundColor: 'white',
                                                         borderRadius: 12,
                                                         padding: 16,
@@ -480,16 +673,16 @@ const SubModulesScreen = ({ navigation }) => {
                                                         {/* Card Header: Type Badge + Actions */}
                                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                                             <View style={{
-                                                                backgroundColor: item.property_type?.toLowerCase().includes('own') ? '#e0e7ff' : '#fef3c7',
+                                                                backgroundColor: (isVehicleItem || item.property_type?.toLowerCase().includes('own')) ? '#e0e7ff' : '#fef3c7',
                                                                 paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6
                                                             }}>
-                                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.property_type?.toLowerCase().includes('own') ? '#4338ca' : '#d97706' }} />
+                                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (isVehicleItem || item.property_type?.toLowerCase().includes('own')) ? '#4338ca' : '#d97706' }} />
                                                                 <Text style={{
                                                                     fontSize: 11, fontWeight: '800',
-                                                                    color: item.property_type?.toLowerCase().includes('own') ? '#4338ca' : '#d97706',
+                                                                    color: (isVehicleItem || item.property_type?.toLowerCase().includes('own')) ? '#4338ca' : '#d97706',
                                                                     textTransform: 'uppercase'
                                                                 }}>
-                                                                    {item.property_type?.toLowerCase().includes('own') ? 'OWNED' : 'RENTAL'}
+                                                                    {isVehicleItem ? 'VEHICLE' : (item.property_type?.toLowerCase().includes('own') ? 'OWNED' : 'RENTAL')}
                                                                 </Text>
                                                             </View>
 
@@ -509,20 +702,25 @@ const SubModulesScreen = ({ navigation }) => {
                                                                 {item.name}
                                                             </Text>
                                                             <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                                {item.premises_type || 'OFFICE'}
+                                                                {isVehicleItem ? (item.vehicle_usage || 'Usage') : (item.premises_type || 'OFFICE')}
                                                             </Text>
                                                         </View>
 
                                                         {/* Grid Details */}
-                                                        <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderRadius: 8, padding: 12, gap: 16, borderWidth: 1, borderColor: '#f1f5f9' }}>
+                                                        <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderRadius: 8, padding: 10, gap: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
                                                             <View style={{ flex: 1 }}>
-                                                                <Text style={{ fontSize: 10, color: '#94a3b8', fontWeight: '700', marginBottom: 4 }}>COUNTRY</Text>
-                                                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '600' }}>{item.country || 'Unknown'}</Text>
+                                                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: '700', marginBottom: 2 }}>COUNTRY</Text>
+                                                                <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>{item.country || 'Unknown'}</Text>
                                                             </View>
                                                             <View style={{ width: 1, backgroundColor: '#e2e8f0' }} />
                                                             <View style={{ flex: 1 }}>
-                                                                <Text style={{ fontSize: 10, color: '#94a3b8', fontWeight: '700', marginBottom: 4 }}>AREA</Text>
-                                                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '600' }}>{item.section_area || 'Free Zone'}</Text>
+                                                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: '700', marginBottom: 2 }}>REGION</Text>
+                                                                <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>{item.region || 'N/A'}</Text>
+                                                            </View>
+                                                            <View style={{ width: 1, backgroundColor: '#e2e8f0' }} />
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: '700', marginBottom: 2 }}>AREA</Text>
+                                                                <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>{item.section_area || 'Free Zone'}</Text>
                                                             </View>
                                                         </View>
                                                     </View>
@@ -531,7 +729,7 @@ const SubModulesScreen = ({ navigation }) => {
 
                                             // Generic Mobile Card
                                             return (
-                                                <View key={item.id} style={styles.mobileCardItem}>
+                                                <View key={`mobile-gen-${item.id}-${idx}`} style={styles.mobileCardItem}>
                                                     <View style={styles.mobileTopRow}>
                                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                                             <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#fff3e0', justifyContent: 'center', alignItems: 'center' }}>
@@ -550,19 +748,31 @@ const SubModulesScreen = ({ navigation }) => {
                                                     </View>
 
                                                     <View style={styles.mobileDetailsGrid}>
-                                                        <View style={[styles.mobileInfoCol, { flex: 1, minWidth: '30%' }]}>
+                                                        <View style={[styles.mobileInfoCol, { flex: 1, minWidth: '45%' }]}>
                                                             <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2 }}>COUNTRY</Text>
                                                             <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }}>{item.country || 'N/A'}</Text>
                                                         </View>
-                                                        <View style={[styles.mobileInfoCol, { flex: 1, minWidth: '30%' }]}>
-                                                            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2 }}>PROPERTY</Text>
+                                                        <View style={[styles.mobileInfoCol, { flex: 1, minWidth: '45%' }]}>
+                                                            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2 }}>REGION</Text>
+                                                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }}>{item.region || 'All'}</Text>
+                                                        </View>
+                                                        <View style={[styles.mobileInfoCol, { flex: 1, minWidth: '45%' }]}>
+                                                            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2 }}>
+                                                                {item.name?.toLowerCase().includes('vehicle') ? 'USAGE' : 'PROPERTY'}
+                                                            </Text>
                                                             <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }}>
-                                                                {item.property_type ? (item.property_type.toLowerCase().includes('own') ? 'Owned' : 'Rented') : 'N/A'}
+                                                                {item.name?.toLowerCase().includes('vehicle')
+                                                                    ? (item.vehicle_usage || 'All')
+                                                                    : (item.property_type ? (item.property_type.toLowerCase().includes('own') ? 'Owned' : 'Rented') : 'All')}
                                                             </Text>
                                                         </View>
-                                                        <View style={[styles.mobileInfoCol, { flex: 1, minWidth: '30%' }]}>
-                                                            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2 }}>PREMISE</Text>
-                                                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }} numberOfLines={1}>{item.premises_type || 'N/A'}</Text>
+                                                        <View style={[styles.mobileInfoCol, { flex: 1, minWidth: '45%' }]}>
+                                                            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2 }}>
+                                                                {item.name?.toLowerCase().includes('vehicle') ? 'STATUS' : 'PREMISE'}
+                                                            </Text>
+                                                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }} numberOfLines={1}>
+                                                                {item.name?.toLowerCase().includes('vehicle') ? (item.status || 'ACTIVE') : (item.premises_type || 'All')}
+                                                            </Text>
                                                         </View>
                                                     </View>
 
@@ -582,15 +792,18 @@ const SubModulesScreen = ({ navigation }) => {
                                     </ScrollView>
                                 ) : (
                                     /* Desktop View */
-                                    (filterModule?.module_name === 'Premises' || paginatedItems[0]?.module_name === 'Premises') ? (
-                                        /* Specialized Premises Table View (Desktop) */
+                                    (filterModule?.module_name === 'Premises' || filterModule?.module_name?.toLowerCase().includes('vehicle') || paginatedItems[0]?.module_name === 'Premises' || paginatedItems[0]?.module_name?.toLowerCase().includes('vehicle')) ? (
+                                        /* Specialized Table View (Desktop) */
                                         <DataTable>
                                             {/* Header Stripe */}
                                             <DataTable.Header style={[styles.tableHeader, { backgroundColor: '#5c6bc0', height: 48, borderTopLeftRadius: 8, borderTopRightRadius: 8, borderBottomWidth: 0 }]}>
                                                 <DataTable.Title style={{ flex: 1 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>TYPE</DataTable.Title>
-                                                <DataTable.Title style={{ flex: 2 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>PREMISES NAME</DataTable.Title>
+                                                <DataTable.Title style={{ flex: 2 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>
+                                                    {(filterModule?.module_name?.toLowerCase().includes('vehicle') || paginatedItems[0]?.module_name?.toLowerCase().includes('vehicle')) ? 'VEHICLE NAME' : 'PREMISES NAME'}
+                                                </DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1.5 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>USAGE</DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1.5 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>COUNTRY</DataTable.Title>
+                                                <DataTable.Title style={{ flex: 1.5 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>REGION</DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1.5 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>AREA</DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1, justifyContent: 'flex-end', paddingRight: 16 }} textStyle={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>ACTIONS</DataTable.Title>
                                             </DataTable.Header>
@@ -598,18 +811,18 @@ const SubModulesScreen = ({ navigation }) => {
                                             {/* Table Content */}
                                             <ScrollView style={{ maxHeight: 'calc(100vh - 460px)' }}>
                                                 {paginatedItems.map((item, index) => (
-                                                    <DataTable.Row key={item.id} style={[styles.row, { borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: index % 2 === 0 ? 'white' : '#f8fafc', height: 60 }]}>
+                                                    <DataTable.Row key={`desktop-prem-${item.id}-${index}`} style={[styles.row, { borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: index % 2 === 0 ? 'white' : '#f8fafc', height: 60 }]}>
 
                                                         {/* TYPE Column */}
                                                         <DataTable.Cell style={{ flex: 1 }}>
                                                             <View style={{
-                                                                backgroundColor: item.property_type?.toLowerCase().includes('own') ? '#e0e7ff' : '#fef3c7',
+                                                                backgroundColor: (item.module_name?.toLowerCase().includes('vehicle') || item.property_type?.toLowerCase().includes('own')) ? '#e0e7ff' : '#fef3c7',
                                                                 borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6,
                                                                 flexDirection: 'row', alignItems: 'center', gap: 6
                                                             }}>
-                                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.property_type?.toLowerCase().includes('own') ? '#4338ca' : '#d97706' }} />
-                                                                <Text style={{ color: item.property_type?.toLowerCase().includes('own') ? '#4338ca' : '#d97706', fontWeight: '800', fontSize: 11 }}>
-                                                                    {item.property_type?.toLowerCase().includes('own') ? 'OWNED' : 'RENTAL'}
+                                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (item.module_name?.toLowerCase().includes('vehicle') || item.property_type?.toLowerCase().includes('own')) ? '#4338ca' : '#d97706' }} />
+                                                                <Text style={{ color: (item.module_name?.toLowerCase().includes('vehicle') || item.property_type?.toLowerCase().includes('own')) ? '#4338ca' : '#d97706', fontWeight: '800', fontSize: 11 }}>
+                                                                    {item.module_name?.toLowerCase().includes('vehicle') ? 'VEHICLE' : (item.property_type?.toLowerCase().includes('own') ? 'OWNED' : 'RENTAL')}
                                                                 </Text>
                                                             </View>
                                                         </DataTable.Cell>
@@ -618,11 +831,11 @@ const SubModulesScreen = ({ navigation }) => {
                                                         <DataTable.Cell style={{ flex: 2 }}>
                                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                                                 <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' }}>
-                                                                    <MaterialCommunityIcons name={item.property_type?.toLowerCase().includes('own') ? 'briefcase-outline' : 'home-city-outline'} size={20} color="#5c6bc0" />
+                                                                    <MaterialCommunityIcons name={item.module_name?.toLowerCase().includes('vehicle') ? 'car-outline' : (item.property_type?.toLowerCase().includes('own') ? 'briefcase-outline' : 'home-city-outline')} size={20} color="#5c6bc0" />
                                                                 </View>
                                                                 <View>
                                                                     <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#1e293b' }}>{item.name}</Text>
-                                                                    <Text style={{ fontSize: 11, color: '#94a3b8' }}>N/A</Text>
+                                                                    <Text style={{ fontSize: 11, color: '#94a3b8' }}>All</Text>
                                                                 </View>
                                                             </View>
                                                         </DataTable.Cell>
@@ -630,21 +843,29 @@ const SubModulesScreen = ({ navigation }) => {
                                                         {/* USAGE Column */}
                                                         <DataTable.Cell style={{ flex: 1.5 }}>
                                                             <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500', textTransform: 'uppercase' }}>
-                                                                {item.premises_type || 'OFFICE'}
+                                                                {item.vehicle_usage || item.premises_type || 'All'}
                                                             </Text>
                                                         </DataTable.Cell>
 
                                                         {/* COUNTRY Column */}
                                                         <DataTable.Cell style={{ flex: 1.5 }}>
                                                             <View>
-                                                                <Text style={{ fontSize: 13, color: '#1e293b', fontWeight: '600' }}>{item.country || 'Unknown'}</Text>
-                                                                <Text style={{ fontSize: 11, color: '#94a3b8' }}>Unknown</Text>
+                                                                <Text style={{ fontSize: 13, color: '#1e293b', fontWeight: '600' }}>{item.country || 'All'}</Text>
+                                                                <Text style={{ fontSize: 11, color: '#94a3b8' }}>Country</Text>
+                                                            </View>
+                                                        </DataTable.Cell>
+
+                                                        {/* REGION Column */}
+                                                        <DataTable.Cell style={{ flex: 1.5 }}>
+                                                            <View>
+                                                                <Text style={{ fontSize: 13, color: '#1e293b', fontWeight: '600' }}>{item.region || 'All'}</Text>
+                                                                <Text style={{ fontSize: 11, color: '#94a3b8' }}>Region</Text>
                                                             </View>
                                                         </DataTable.Cell>
 
                                                         {/* AREA Column */}
                                                         <DataTable.Cell style={{ flex: 1.5 }}>
-                                                            <Text style={{ fontSize: 13, color: '#475569' }}>{item.section_area || 'Free Zone'}</Text>
+                                                            <Text style={{ fontSize: 13, color: '#475569' }}>{item.section_area || 'All'}</Text>
                                                         </DataTable.Cell>
 
                                                         {/* ACTIONS Column */}
@@ -671,15 +892,15 @@ const SubModulesScreen = ({ navigation }) => {
                                             <DataTable.Header style={[styles.tableHeader, { backgroundColor: '#5e35b1', borderTopLeftRadius: 10, borderTopRightRadius: 10 }]}>
                                                 <DataTable.Title style={{ flex: 2 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>MODULE NAME</DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>COUNTRY</DataTable.Title>
-                                                <DataTable.Title style={{ flex: 1 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>PROPERTY</DataTable.Title>
-                                                <DataTable.Title style={{ flex: 1.5 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>PREMISE TYPE</DataTable.Title>
+                                                <DataTable.Title style={{ flex: 1 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>REGION</DataTable.Title>
+                                                <DataTable.Title style={{ flex: 1.5 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>TYPE / USAGE</DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>AREA</DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>STATUS</DataTable.Title>
                                                 <DataTable.Title style={{ flex: 1 }} textStyle={{ color: 'white', fontWeight: 'bold' }}>ACTION</DataTable.Title>
                                             </DataTable.Header>
                                             <ScrollView style={{ maxHeight: 'calc(100vh - 460px)' }}>
-                                                {paginatedItems.map((item) => (
-                                                    <DataTable.Row key={item.id} style={styles.row}>
+                                                {paginatedItems.map((item, index) => (
+                                                    <DataTable.Row key={`desktop-gen-${item.id}-${index}`} style={styles.row}>
                                                         <DataTable.Cell style={{ flex: 2 }}>
                                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                                 <View style={{ width: 32, height: 32, borderRadius: 6, backgroundColor: '#fff3e0', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
@@ -688,16 +909,18 @@ const SubModulesScreen = ({ navigation }) => {
                                                                 <Text style={{ fontWeight: 'bold', color: '#1e293b' }} numberOfLines={1}>{item.name}</Text>
                                                             </View>
                                                         </DataTable.Cell>
-                                                        <DataTable.Cell style={{ flex: 1 }}>{item.country || 'N/A'}</DataTable.Cell>
-                                                        <DataTable.Cell style={{ flex: 1 }}>{item.property_type ? (item.property_type.toLowerCase().includes('own') ? 'Owned' : 'Rented') : 'N/A'}</DataTable.Cell>
+                                                        <DataTable.Cell style={{ flex: 1 }}>{item.country || 'All'}</DataTable.Cell>
+                                                        <DataTable.Cell style={{ flex: 1 }}>{item.region || 'All'}</DataTable.Cell>
                                                         <DataTable.Cell style={{ flex: 1.5 }}>
                                                             <View>
-                                                                <Text style={{ fontSize: 13 }} numberOfLines={1}>{item.premises_type || 'N/A'}</Text>
-                                                                {item.section_area && <Text style={{ fontSize: 11, color: '#94a3b8' }}>{item.section_area}</Text>}
+                                                                <Text style={{ fontSize: 13, fontWeight: 'bold' }} numberOfLines={1}>
+                                                                    {item.vehicle_usage || item.premises_type || 'All'}
+                                                                </Text>
+                                                                {item.property_type && <Text style={{ fontSize: 11, color: '#94a3b8' }}>{item.property_type}</Text>}
                                                             </View>
                                                         </DataTable.Cell>
                                                         <DataTable.Cell style={{ flex: 1 }}>
-                                                            <Text numberOfLines={1}>{item.section_area || '-'}</Text>
+                                                            <Text numberOfLines={1}>{item.section_area || 'All'}</Text>
                                                         </DataTable.Cell>
                                                         <DataTable.Cell style={{ flex: 1 }}>
                                                             <View style={{ backgroundColor: (item.is_active || item.status === 'ACTIVE') ? '#dcfce7' : '#fee2e2', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
@@ -754,7 +977,7 @@ const SubModulesScreen = ({ navigation }) => {
                                             if (i === page || i === 0 || i === Math.ceil(totalItems / itemsPerPage) - 1 || (i >= page - 1 && i <= page + 1)) {
                                                 return (
                                                     <TouchableOpacity
-                                                        key={i}
+                                                        key={`page-${i}`}
                                                         style={[styles.pageBtn, page === i ? styles.pageBtnActive : styles.pageBtnOutlined]}
                                                         onPress={() => setPage(i)}
                                                     >
@@ -796,17 +1019,16 @@ const SubModulesScreen = ({ navigation }) => {
                                 <Title style={styles.modalTitle}>{editingId ? 'Submodule Details' : 'Add Submodule'}</Title>
                                 <Text style={styles.modalSubtitle}>{editingId ? 'View selected submodule details' : 'Configure new submodule'}</Text>
                             </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                 <TouchableOpacity
                                     onPress={() => {
                                         if (selectedModule) fetchSections(selectedModule.module_id || selectedModule.id);
                                     }}
-                                    style={{ marginRight: 16 }}
                                 >
-                                    <MaterialCommunityIcons name="refresh" size={24} color="#673ab7" />
+                                    <MaterialCommunityIcons name="refresh" size={26} color="#673ab7" />
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                    <MaterialCommunityIcons name="close" size={24} color="#64748b" />
+                                    <MaterialCommunityIcons name="close" size={26} color="#64748b" />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -815,39 +1037,103 @@ const SubModulesScreen = ({ navigation }) => {
                         {loadingData ? (
                             <ActivityIndicator size="large" color="#673ab7" style={{ marginVertical: 40 }} />
                         ) : isMobile ? (
-                            <ScrollView style={{ maxHeight: '70vh' }} showsVerticalScrollIndicator={false}>
-                                <View style={{ flexDirection: 'column', gap: 12, paddingBottom: 20 }}>
-                                    {renderDropdown("Module Name", "Select...", selectedModule, modules, setSelectedModule, 'module', 'module_name')}
-                                    {renderStructure()}
-                                    {renderDropdown("Country", "Select...", selectedCountry, countries, setSelectedCountry, 'country', 'country_name')}
-                                    {renderDropdown("Property Type", "Select...", selectedPropertyType, propertyTypes, setSelectedPropertyType, 'property', 'name')}
-                                    {renderDropdown("Premise Type", "Select...", selectedType, types, setSelectedType, 'type', 'type_name')}
-                                    {renderDropdown("Area", "Select Area...", selectedArea, areas, setSelectedArea, 'area', 'name')}
-                                    <View style={{ marginTop: 4 }}>
-                                        <Text style={styles.inputLabel}>Status</Text>
-                                        <Switch value={status} onValueChange={setStatus} />
+                            wizardStep === 1 ? (
+                                <ScrollView style={{ maxHeight: '70vh' }} showsVerticalScrollIndicator={false}>
+                                    <View style={{ flexDirection: 'column', gap: 12, paddingBottom: 20 }}>
+                                        {renderDropdown("Module Name", "Select...", selectedModule, modules, setSelectedModule, 'module', 'module_name')}
+                                        {renderDropdown("Country", "Select...", selectedCountry, countries, setSelectedCountry, 'country', 'country_name')}
+                                        {renderDropdown("Region", "Select Region...", selectedRegion, regions, setSelectedRegion, 'region', 'name', {}, !!selectedCountry?.isAll)}
+
+                                        {/* Conditional Fields based on Module */}
+                                        {selectedModule?.module_name?.toLowerCase().includes('vehicle') ? (
+                                            renderDropdown("Usage", "Select...", selectedType, vehicleUsages, setSelectedType, 'type', 'name')
+                                        ) : (
+                                            <>
+                                                {renderDropdown("Property Type", "Select...", selectedPropertyType, propertyTypes, setSelectedPropertyType, 'property', 'name')}
+                                                {renderDropdown("Premise Type", "Select...", selectedType, types, setSelectedType, 'type', 'type_name')}
+                                                {renderDropdown("Area", "Select Area...", selectedArea, areas, setSelectedArea, 'area', 'name')}
+                                            </>
+                                        )}
+
+                                        <View style={{ marginTop: 4 }}>
+                                            <Text style={styles.inputLabel}>Status</Text>
+                                            <Switch value={status} onValueChange={setStatus} />
+                                        </View>
                                     </View>
+                                </ScrollView>
+                            ) : (
+                                <View style={{ height: '70vh' }}>
+                                    {renderStructure()}
                                 </View>
-                            </ScrollView>
+                            )
                         ) : (
-                            <>
-                                <View style={[styles.formRow, { zIndex: dropdownOpen ? 1000 : 1 }]}>
+                            wizardStep === 1 ? (
+                                <View style={[styles.formRow, { zIndex: dropdownOpen ? 1000 : 1, paddingBottom: 20 }]}>
                                     {renderDropdown("Module Name", "Select...", selectedModule, modules, setSelectedModule, 'module', 'module_name', { flex: 1.5, marginRight: 8 })}
                                     {renderDropdown("Country", "Select...", selectedCountry, countries, setSelectedCountry, 'country', 'country_name', { flex: 1.2, marginRight: 8 })}
-                                    {renderDropdown("Property Type", "Select...", selectedPropertyType, propertyTypes, setSelectedPropertyType, 'property', 'name', { flex: 1, marginRight: 8 })}
-                                    {renderDropdown("Premise Type", "Select...", selectedType, types, setSelectedType, 'type', 'type_name', { flex: 1, marginRight: 8 })}
-                                    {renderDropdown("Area", "Select Area...", selectedArea, areas, setSelectedArea, 'area', 'name', { flex: 1.2, marginRight: 8 })}
+                                    {renderDropdown("Region", "Select...", selectedRegion, regions, setSelectedRegion, 'region', 'name', { flex: 1.2, marginRight: 8 }, !!selectedCountry?.isAll)}
+
+                                    {/* Conditional Desktop Layout */}
+                                    {selectedModule?.module_name?.toLowerCase().includes('vehicle') ? (
+                                        renderDropdown("Usage", "Select...", selectedType, vehicleUsages, setSelectedType, 'type', 'name', { flex: 1.5, marginRight: 8 })
+                                    ) : (
+                                        <>
+                                            {renderDropdown("Property Type", "Select...", selectedPropertyType, propertyTypes, setSelectedPropertyType, 'property', 'name', { flex: 1, marginRight: 8 })}
+                                            {renderDropdown("Premise Type", "Select...", selectedType, types, setSelectedType, 'type', 'type_name', { flex: 1, marginRight: 8 })}
+                                            {renderDropdown("Area", "Select Area...", selectedArea, areas, setSelectedArea, 'area', 'name', { flex: 1.2, marginRight: 8 })}
+                                        </>
+                                    )}
+
                                     <View style={styles.statusContainer}>
                                         <Text style={styles.inputLabel}>Status</Text>
                                         <Switch value={status} onValueChange={setStatus} />
                                     </View>
                                 </View>
-                                {renderStructure()}
-                            </>
+                            ) : (
+                                renderStructure()
+                            )
                         )}
                         <View style={styles.modalFooter}>
-                            <Button mode="outlined" onPress={() => setModalVisible(false)} style={{ marginRight: 12 }}>Cancel</Button>
-                            <Button mode="contained" onPress={handleSave} buttonColor="#673ab7">Save</Button>
+                            <Button
+                                mode="outlined"
+                                onPress={() => setModalVisible(false)}
+                                style={styles.modalCancelBtn}
+                                labelStyle={styles.modalCancelBtnText}
+                            >
+                                Cancel
+                            </Button>
+                            {wizardStep === 1 ? (
+                                <Button
+                                    mode="contained"
+                                    onPress={() => setWizardStep(2)}
+                                    buttonColor={selectedModule ? "#673ab7" : "#e2e8f0"}
+                                    style={[styles.modalNextBtn, !selectedModule && styles.modalNextBtnDisabled]}
+                                    labelStyle={{ color: selectedModule ? 'white' : '#94a3b8', fontWeight: '700' }}
+                                    disabled={!selectedModule}
+                                >
+                                    Next
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button
+                                        mode="outlined"
+                                        onPress={() => setWizardStep(1)}
+                                        style={styles.modalCancelBtn}
+                                        labelStyle={styles.modalCancelBtnText}
+                                    >
+                                        Back
+                                    </Button>
+                                    <Button
+                                        mode="contained"
+                                        onPress={handleSave}
+                                        buttonColor="#673ab7"
+                                        style={styles.modalNextBtn}
+                                        labelStyle={{ color: 'white', fontWeight: '700' }}
+                                    >
+                                        Save
+                                    </Button>
+                                </>
+                            )}
                         </View>
                     </Modal>
 
@@ -1063,16 +1349,69 @@ const styles = StyleSheet.create({
     badgeText: { fontSize: 11, fontWeight: '700' },
     badgeTextActive: { color: '#166534' },
     badgeTextInactive: { color: '#64748b' },
-    modalContent: { backgroundColor: 'white', padding: 32, borderRadius: 12, width: '90%', maxWidth: 1000, alignSelf: 'center' },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-    modalTitle: { fontSize: 20, fontWeight: 'bold' },
-    modalSubtitle: { fontSize: 13, color: '#64748b' },
-    divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 20 },
-    formRow: { flexDirection: 'row', alignItems: 'center' },
-    inputContainer: { flex: 1 },
-    inputLabel: { fontSize: 13, fontWeight: '700', marginBottom: 4 },
-    dropdownTrigger: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8 },
-    dropdownTriggerActive: { borderColor: '#673ab7' },
+    modalContent: {
+        backgroundColor: 'white',
+        padding: 32,
+        borderRadius: 24,
+        width: '90%',
+        maxWidth: 1100,
+        alignSelf: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.1,
+        shadowRadius: 30,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 10,
+    },
+    modalTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1e293b',
+        letterSpacing: -0.5,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#94a3b8',
+        marginTop: 2,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#f1f5f9',
+        marginVertical: 24,
+    },
+    formRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        gap: 12,
+    },
+    inputContainer: {
+        flex: 1,
+    },
+    inputLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginBottom: 8,
+    },
+    dropdownTrigger: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        height: 48,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 12,
+    },
+    dropdownTriggerActive: {
+        borderColor: '#673ab7',
+        borderWidth: 2,
+    },
     dropdownText: { fontSize: 14 },
     placeholderText: { color: '#94a3b8' },
     dropdownList: {
@@ -1091,20 +1430,53 @@ const styles = StyleSheet.create({
     },
     dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
     dropdownItemText: { fontSize: 14, color: '#1e293b' },
-    statusContainer: { marginLeft: 16 },
-    structureSection: { marginTop: 20 },
-    sectionLabel: { fontSize: 11, fontWeight: '700', color: '#94a3b8', marginBottom: 10 },
-    structureBox: { padding: 16, backgroundColor: '#f8fafc', borderRadius: 8 },
-    structureTextPlaceholder: { color: '#94a3b8', fontSize: 14 },
-    structureListContainer: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8 },
-    structureHeader: { flexDirection: 'row', padding: 12, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-    structureHeaderText: { fontWeight: '700', fontSize: 14, color: '#334155' },
+    statusContainer: {
+        marginLeft: 12,
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        paddingBottom: 4,
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: 40,
+        gap: 16,
+    },
+    modalCancelBtn: {
+        borderRadius: 100,
+        paddingHorizontal: 24,
+        borderColor: '#e2e8f0',
+        height: 48,
+        justifyContent: 'center',
+    },
+    modalCancelBtnText: {
+        color: '#3b82f6',
+        fontWeight: '600',
+        fontSize: 15,
+    },
+    modalNextBtn: {
+        borderRadius: 100,
+        paddingHorizontal: 32,
+        height: 48,
+        justifyContent: 'center',
+        elevation: 0,
+    },
+    modalNextBtnDisabled: {
+        backgroundColor: '#e2e8f0',
+        opacity: 0.8,
+    },
+    structureSection: { marginTop: 24 },
+    sectionLabel: { fontSize: 12, fontWeight: '700', color: '#94a3b8', marginBottom: 12, textTransform: 'uppercase' },
+    structureBox: { padding: 20, backgroundColor: '#f8fafc', borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' },
+    structureTextPlaceholder: { color: '#94a3b8', fontSize: 14, textAlign: 'center' },
+    structureListContainer: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
+    structureHeader: { flexDirection: 'row', padding: 16, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+    structureHeaderText: { fontWeight: '700', fontSize: 14, color: '#1e293b' },
     accordionContainer: { borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-    accordionHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 12 },
-    accordionTitle: { fontWeight: '600' },
-    accordionContent: { paddingLeft: 20, paddingBottom: 10 },
-    fieldItem: { flexDirection: 'row', alignItems: 'center' },
-    modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20 },
+    accordionHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, alignItems: 'center' },
+    accordionTitle: { fontWeight: '700', color: '#334155' },
+    accordionContent: { paddingLeft: 16, paddingBottom: 16, paddingRight: 16 },
+    fieldItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
     paginationFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',

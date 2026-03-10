@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Activi
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import BaseModal from './BaseModal';
 
-const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
+const ClientFormModal = ({ visible, onClose, onSave, client = null, readOnly = false }) => {
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const initialState = {
@@ -14,36 +14,22 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
         tax_no: '',
         industry: '',
         logo: '',
-        // 2. Tenancy
-        tenancy_type: 'OWNED', // OWNED | RENTED
-        landlord_name: '',
-        contract_start_date: '',
-        contract_end_date: '',
-        registration_no: '',
-        ownership_doc_ref: '',
-        // 3. Location
-        country: '',
-        state: '',
-        city: '',
-        area: '',
-        address: '',
-        po_box: '',
-        makani_number: '',
-        // 4. Contact
+        // 2. Contact
         telephone: '',
         email: '',
         website: '',
         support_email: '',
-        // 5. Limits
+        // 3. Limits
         max_companies: 5,
         max_employees: 100,
         max_assets: 500,
         enabled_modules: ['dashboard', 'assets'],
-        // 6. Admin
+        // 4. Admin
         admin_name: '',
         admin_email: '',
         admin_password: '',
         auto_generate_password: true,
+        send_email: true,
         status: 'ACTIVE'
     };
 
@@ -67,12 +53,9 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
     }, [client, visible]);
 
     const steps = [
-        { id: 1, title: 'Identity', icon: 'domain' },
-        { id: 2, title: 'Tenancy', icon: 'home-city' },
-        { id: 3, title: 'Location', icon: 'map-marker' },
-        { id: 4, title: 'Contact', icon: 'phone' },
-        { id: 5, title: 'Limits', icon: 'shield-check' },
-        { id: 6, title: 'Admin', icon: 'account-plus' },
+        { id: 1, title: 'Admin', icon: 'account-plus' },
+        { id: 2, title: 'Identity', icon: 'domain' },
+        { id: 3, title: 'Limits', icon: 'shield-check' },
     ];
 
     const handleSave = async () => {
@@ -103,15 +86,16 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
         <View style={styles.inputContainer}>
             {label && <Text style={styles.inputLabel}>{label}</Text>}
             <TextInput
-                style={[styles.input, multiline && styles.textArea]}
+                style={[styles.input, multiline && styles.textArea, readOnly && styles.readOnlyInput]}
                 value={formData[key]?.toString()}
-                onChangeText={(text) => setFormData({ ...formData, [key]: text })}
+                onChangeText={(text) => !readOnly && setFormData({ ...formData, [key]: text })}
                 placeholder={placeholder}
                 placeholderTextColor="#94a3b8"
                 keyboardType={keyboard}
                 multiline={multiline}
                 secureTextEntry={isPassword}
                 autoComplete={autoComplete}
+                editable={!readOnly}
             />
             {helperText && <Text style={styles.helperText}>{helperText}</Text>}
         </View>
@@ -124,127 +108,126 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
         </View>
     );
 
+    const renderDataRow = (label, value, icon) => (
+        <View style={styles.summaryRow}>
+            <View style={styles.summaryLabelGroup}>
+                <MaterialCommunityIcons name={icon} size={16} color="#94a3b8" />
+                <Text style={styles.summaryLabel}>{label}</Text>
+            </View>
+            <Text style={styles.summaryValue}>{value || '-'}</Text>
+        </View>
+    );
+
     const renderStepContent = () => {
-        switch (currentStep) {
-            case 1: // Identity
-                return (
+        if (readOnly) {
+            const modules = [
+                { key: 'dashboard', label: 'Dashboard', icon: 'view-dashboard' },
+                { key: 'companies', label: 'Company', icon: 'domain' },
+                { key: 'assets', label: 'Assets', icon: 'cube' },
+                { key: 'premises', label: 'Premises', icon: 'office-building' },
+                { key: 'vehicles', label: 'Vehicles', icon: 'car' },
+                { key: 'premises_display', label: 'Premises Display', icon: 'monitor-dashboard' },
+                { key: 'employees', label: 'Staff Members', icon: 'account-group' },
+                { key: 'module', label: 'Module', icon: 'view-grid-plus' },
+                { key: 'module_sections', label: 'Module Sections', icon: 'view-agenda' },
+                { key: 'sub_modules', label: 'Sub-modules', icon: 'view-list' },
+                { key: 'maintenance', label: 'Maintenance', icon: 'wrench' },
+                { key: 'reports', label: 'Reports', icon: 'file-chart' },
+            ];
 
-                    <View style={styles.stepContent}>
-                        {renderSectionHeader('Company Identity', 'Legal and business identification details')}
-                        {renderInput('COMPANY NAME*', 'name', 'e.g. Acme Corp Global')}
-                        <View style={styles.row}>
-                            <View style={{ flex: 1 }}>{renderInput('SHORT NAME', 'company_code', 'ACME', 'As per trade license')}</View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('INDUSTRY', 'industry', 'Technology')}</View>
+            return (
+                <View style={styles.stepContent}>
+                    {/* Client Identity Details */}
+                    <View style={styles.detailSection}>
+                        <View style={styles.sectionHeaderCompact}>
+                            <MaterialCommunityIcons name="domain" size={20} color="#6c7ae0" />
+                            <Text style={styles.sectionTitleCompact}>Company Information</Text>
                         </View>
-                        {renderInput('TRADE LICENSE / REG NO.', 'trade_license', 'TL-12345', 'Used for invoicing & compliance')}
-                        {renderInput('TAX / VAT NO.', 'tax_no', 'VAT-98765')}
-                    </View>
-                );
-
-            case 2: // Tenancy
-                return (
-                    <View style={styles.stepContent}>
-                        <Text style={styles.sectionTitle}>Main Premises Tenancy</Text>
-                        <View style={styles.typeSelector}>
-                            {['OWNED', 'RENTED'].map(type => (
-                                <TouchableOpacity
-                                    key={type}
-                                    style={[styles.typeButton, formData.tenancy_type === type && styles.typeButtonActive]}
-                                    onPress={() => setFormData({ ...formData, tenancy_type: type })}
-                                >
-                                    <MaterialCommunityIcons
-                                        name={type === 'OWNED' ? 'home' : 'office-building'}
-                                        size={20}
-                                        color={formData.tenancy_type === type ? '#6c7ae0' : '#64748b'}
-                                    />
-                                    <Text style={[styles.typeButtonText, formData.tenancy_type === type && styles.typeButtonTextActive]}>{type}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                        {formData.tenancy_type === 'RENTED' ? (
-                            <>
-                                {renderInput('Landlord Name', 'landlord_name', 'Landlord Co.')}
-                                <View style={styles.row}>
-                                    <View style={{ flex: 1 }}>{renderInput('Start Date', 'contract_start_date', 'YYYY-MM-DD')}</View>
-                                    <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('End Date', 'contract_end_date', 'YYYY-MM-DD')}</View>
+                        <View style={styles.detailsGrid}>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>COMPANY NAME</Text>
+                                <Text style={styles.detailValue}>{formData.name}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>COMPANY CODE</Text>
+                                <Text style={styles.detailValue}>{formData.company_code}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>INDUSTRY</Text>
+                                <Text style={styles.detailValue}>{formData.industry}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>STATUS</Text>
+                                <View style={[styles.statusBadgeSmall, formData.status === 'ACTIVE' ? styles.statusActive : styles.statusInactive]}>
+                                    <Text style={[styles.statusTextSmall, { color: formData.status === 'ACTIVE' ? '#16a34a' : '#ef4444' }]}>
+                                        {formData.status}
+                                    </Text>
                                 </View>
-                                {renderInput('Ejari / Tawtheeq No.', 'registration_no', 'REG-123-456')}
-                            </>
-                        ) : (
-                            renderInput('Ownership Doc Ref', 'ownership_doc_ref', 'DEED-789-012')
-                        )}
-                    </View>
-                );
-            case 3: // Location
-                return (
-                    <View style={styles.stepContent}>
-                        <View style={styles.row}>
-                            <View style={{ flex: 1 }}>{renderInput('Country*', 'country', 'United Arab Emirates')}</View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('State/Emirate*', 'state', 'Dubai')}</View>
-                        </View>
-                        {renderInput('City*', 'city', 'Dubai')}
-                        {renderInput('Area / District', 'area', 'Downtown Dubai')}
-                        {renderInput('Full Address*', 'address', 'Bldg 123, Office 456...', 'default', true)}
-                        <View style={styles.row}>
-                            <View style={{ flex: 1 }}>{renderInput('Makani / Plus Code', 'makani_number', '12345 67890')}</View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('PO Box', 'po_box', '12345')}</View>
+                            </View>
                         </View>
                     </View>
-                );
-            case 4: // Contact
-                return (
-                    <View style={styles.stepContent}>
-                        {renderInput('Telephone', 'telephone', '+971 4 123 4567', 'phone-pad')}
-                        {renderInput('Company Email', 'email', 'info@acme.com', 'email-address')}
-                        {renderInput('Website', 'website', 'https://acme.com', 'url')}
-                        {renderInput('Support Email', 'support_email', 'support@acme.com', 'email-address')}
-                    </View>
-                );
-            case 5: // Limits & Modules
-                const modules = [
-                    { key: 'dashboard', label: 'Dashboard', icon: 'view-dashboard' },
-                    { key: 'companies', label: 'Company', icon: 'domain' },
-                    { key: 'assets', label: 'Assets', icon: 'cube' },
-                    { key: 'premises', label: 'Premises', icon: 'office-building' },
-                    { key: 'vehicles', label: 'Vehicles', icon: 'car' },
-                    { key: 'premises_display', label: 'Premises Display', icon: 'monitor-dashboard' },
-                    { key: 'employees', label: 'Staff Members', icon: 'account-group' },
-                    { key: 'module', label: 'Module', icon: 'view-grid-plus' },
-                    { key: 'module_sections', label: 'Module Sections', icon: 'view-agenda' },
-                    { key: 'sub_modules', label: 'Sub-modules', icon: 'view-list' },
-                    { key: 'maintenance', label: 'Maintenance', icon: 'wrench' },
-                    { key: 'reports', label: 'Reports', icon: 'file-chart' },
-                ];
-                const toggleModule = (key) => {
-                    const current = [...formData.enabled_modules];
-                    const idx = current.indexOf(key);
-                    if (idx > -1) current.splice(idx, 1);
-                    else current.push(key);
-                    setFormData({ ...formData, enabled_modules: current });
-                };
-                return (
-                    <View style={styles.stepContent}>
-                        <View style={styles.row}>
-                            <View style={{ flex: 1 }}>{renderInput('Max Companies', 'max_companies', '5', 'numeric')}</View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('Max Employees*', 'max_employees', '100', 'numeric')}</View>
+
+                    {/* Admin Details */}
+                    <View style={[styles.detailSection, { marginTop: 24 }]}>
+                        <View style={styles.sectionHeaderCompact}>
+                            <MaterialCommunityIcons name="account-tie-outline" size={20} color="#6c7ae0" />
+                            <Text style={styles.sectionTitleCompact}>Admin Contact</Text>
                         </View>
-                        {renderInput('Max Assets*', 'max_assets', '500', 'numeric')}
-                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>Enabled Modules*</Text>
-                        <View style={styles.moduleGrid}>
-                            {modules.map(mod => (
-                                <TouchableOpacity
-                                    key={mod.key}
-                                    style={[styles.moduleChip, formData.enabled_modules.includes(mod.key) && styles.moduleChipActive]}
-                                    onPress={() => toggleModule(mod.key)}
-                                >
-                                    <MaterialCommunityIcons name={mod.icon} size={16} color={formData.enabled_modules.includes(mod.key) ? 'white' : '#64748b'} />
-                                    <Text style={[styles.moduleChipText, formData.enabled_modules.includes(mod.key) && styles.moduleChipTextActive]}>{mod.label}</Text>
-                                </TouchableOpacity>
+                        <View style={styles.detailsGrid}>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>ADMIN NAME</Text>
+                                <Text style={styles.detailValue}>{formData.admin_name}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>ADMIN EMAIL</Text>
+                                <Text style={styles.detailValue}>{formData.admin_email}</Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Limits */}
+                    <View style={[styles.detailSection, { marginTop: 24 }]}>
+                        <View style={styles.sectionHeaderCompact}>
+                            <MaterialCommunityIcons name="shield-check-outline" size={20} color="#6c7ae0" />
+                            <Text style={styles.sectionTitleCompact}>Resource Limits</Text>
+                        </View>
+                        <View style={styles.limitsGridFlat}>
+                            <View style={styles.limitCardFlat}>
+                                <Text style={styles.limitValFlat}>{formData.max_companies}</Text>
+                                <Text style={styles.limitLabFlat}>COMPANIES</Text>
+                            </View>
+                            <View style={styles.limitCardFlat}>
+                                <Text style={styles.limitValFlat}>{formData.max_employees}</Text>
+                                <Text style={styles.limitLabFlat}>EMPLOYEES</Text>
+                            </View>
+                            <View style={styles.limitCardFlat}>
+                                <Text style={styles.limitValFlat}>{formData.max_assets}</Text>
+                                <Text style={styles.limitLabFlat}>ASSETS</Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Modules */}
+                    <View style={[styles.detailSection, { marginTop: 24 }]}>
+                        <View style={styles.sectionHeaderCompact}>
+                            <MaterialCommunityIcons name="apps" size={20} color="#6c7ae0" />
+                            <Text style={styles.sectionTitleCompact}>Enabled Modules</Text>
+                        </View>
+                        <View style={styles.moduleGridSimple}>
+                            {modules.filter(m => formData.enabled_modules.includes(m.key)).map(mod => (
+                                <View key={mod.key} style={styles.moduleTag}>
+                                    <MaterialCommunityIcons name={mod.icon} size={14} color="#64748b" />
+                                    <Text style={styles.moduleTagText}>{mod.label}</Text>
+                                </View>
                             ))}
                         </View>
                     </View>
-                );
-            case 6: // Admin User
+                </View>
+            );
+        }
+
+        switch (currentStep) {
+            case 1: // Admin User
                 return (
                     <View style={styles.stepContent}>
                         <Text style={styles.infoBoxText}>This user will be the primary administrator for this client.</Text>
@@ -288,6 +271,33 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
                             )}
 
                         </View>
+                        {!client && (
+                            <TouchableOpacity
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    marginTop: 15,
+                                    padding: 10,
+                                    backgroundColor: '#f8fafc',
+                                    borderRadius: 10,
+                                    borderWidth: 1,
+                                    borderStyle: 'dashed',
+                                    borderColor: '#cbd5e1',
+                                    gap: 10
+                                }}
+                                onPress={() => setFormData({ ...formData, send_email: !formData.send_email })}
+                            >
+                                <MaterialCommunityIcons
+                                    name={formData.send_email ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                                    size={20}
+                                    color={formData.send_email ? '#6c7ae0' : '#94a3b8'}
+                                />
+                                <View>
+                                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Send welcome email</Text>
+                                    <Text style={{ fontSize: 11, color: '#64748b' }}>Notify admin of their new account.</Text>
+                                </View>
+                            </TouchableOpacity>
+                        )}
                         {client && (
                             <View style={styles.section}>
                                 <Text style={styles.inputLabel}>Account Status</Text>
@@ -306,6 +316,63 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
                         )}
                     </View>
                 );
+
+            case 2: // Identity
+                return (
+                    <View style={styles.stepContent}>
+                        {renderSectionHeader('Company Identity', 'Legal and business identification details')}
+                        {renderInput('COMPANY NAME*', 'name', 'e.g. Acme Corp Global')}
+                        <View style={styles.row}>
+                            <View style={{ flex: 1 }}>{renderInput('SHORT NAME', 'company_code', 'ACME', 'As per trade license')}</View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('INDUSTRY', 'industry', 'Technology')}</View>
+                        </View>
+                    </View>
+                );
+
+            case 3: // Limits & Modules
+                const modules = [
+                    { key: 'dashboard', label: 'Dashboard', icon: 'view-dashboard' },
+                    { key: 'companies', label: 'Company', icon: 'domain' },
+                    { key: 'assets', label: 'Assets', icon: 'cube' },
+                    { key: 'premises', label: 'Premises', icon: 'office-building' },
+                    { key: 'vehicles', label: 'Vehicles', icon: 'car' },
+                    { key: 'premises_display', label: 'Premises Display', icon: 'monitor-dashboard' },
+                    { key: 'employees', label: 'Staff Members', icon: 'account-group' },
+                    { key: 'module', label: 'Module', icon: 'view-grid-plus' },
+                    { key: 'module_sections', label: 'Module Sections', icon: 'view-agenda' },
+                    { key: 'sub_modules', label: 'Sub-modules', icon: 'view-list' },
+                    { key: 'maintenance', label: 'Maintenance', icon: 'wrench' },
+                    { key: 'reports', label: 'Reports', icon: 'file-chart' },
+                ];
+                const toggleModule = (key) => {
+                    const current = [...formData.enabled_modules];
+                    const idx = current.indexOf(key);
+                    if (idx > -1) current.splice(idx, 1);
+                    else current.push(key);
+                    setFormData({ ...formData, enabled_modules: current });
+                };
+                return (
+                    <View style={styles.stepContent}>
+                        <View style={styles.row}>
+                            <View style={{ flex: 1 }}>{renderInput('Max Companies', 'max_companies', '5', 'numeric')}</View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>{renderInput('Max Employees*', 'max_employees', '100', 'numeric')}</View>
+                        </View>
+                        {renderInput('Max Assets*', 'max_assets', '500', 'numeric')}
+                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>Enabled Modules*</Text>
+                        <View style={styles.moduleGrid}>
+                            {modules.map(mod => (
+                                <TouchableOpacity
+                                    key={mod.key}
+                                    style={[styles.moduleChip, formData.enabled_modules.includes(mod.key) && styles.moduleChipActive]}
+                                    onPress={() => toggleModule(mod.key)}
+                                >
+                                    <MaterialCommunityIcons name={mod.icon} size={16} color={formData.enabled_modules.includes(mod.key) ? 'white' : '#64748b'} />
+                                    <Text style={[styles.moduleChipText, formData.enabled_modules.includes(mod.key) && styles.moduleChipTextActive]}>{mod.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                );
             default:
                 return null;
         }
@@ -315,39 +382,40 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
         <BaseModal
             visible={visible}
             onClose={onClose}
-            title={client ? 'Edit Client' : 'Add New Client'}
+            title={readOnly ? 'Client Details' : (client ? 'Edit Client' : 'Add New Client')}
             width={700}
         >
             <View style={styles.mainContainer}>
-                <Text style={styles.modalSubtitle}>Tenant / Company onboarding</Text>
 
                 {/* Modern Pill Stepper */}
-                <View style={styles.progressContainer}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stepperScroll}>
-                        {steps.map((step, idx) => {
-                            const isActive = currentStep === step.id;
-                            const isCompleted = currentStep > step.id;
-                            return (
-                                <React.Fragment key={step.id}>
-                                    <TouchableOpacity
-                                        style={[styles.pillStep, isActive && styles.pillStepActive]}
-                                        onPress={() => setCurrentStep(step.id)}
-                                    >
-                                        <MaterialCommunityIcons
-                                            name={step.icon}
-                                            size={16}
-                                            color={isActive ? 'white' : '#64748b'}
-                                            style={{ marginRight: isActive ? 6 : 0 }}
-                                        />
-                                        {isActive && <Text style={styles.pillStepText}>{step.title}</Text>}
-                                        {!isActive && <Text style={styles.pillStepTextInactive}>{step.title}</Text>}
-                                    </TouchableOpacity>
-                                    {idx < steps.length - 1 && <View style={styles.stepperLine} />}
-                                </React.Fragment>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
+                {!readOnly && (
+                    <View style={styles.progressContainer}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stepperScroll}>
+                            {steps.map((step, idx) => {
+                                const isActive = currentStep === step.id;
+                                const isCompleted = currentStep > step.id;
+                                return (
+                                    <React.Fragment key={step.id}>
+                                        <TouchableOpacity
+                                            style={[styles.pillStep, isActive && styles.pillStepActive]}
+                                            onPress={() => setCurrentStep(step.id)}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name={step.icon}
+                                                size={16}
+                                                color={isActive ? 'white' : '#64748b'}
+                                                style={{ marginRight: isActive ? 6 : 0 }}
+                                            />
+                                            {isActive && <Text style={styles.pillStepText}>{step.title}</Text>}
+                                            {!isActive && <Text style={styles.pillStepTextInactive}>{step.title}</Text>}
+                                        </TouchableOpacity>
+                                        {idx < steps.length - 1 && <View style={styles.stepperLine} />}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                )}
 
                 {/* Content */}
                 <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -357,9 +425,13 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
                 {/* Footer Actions */}
                 <View style={styles.footer}>
                     {/* Left: Step Indicator */}
-                    <Text style={styles.stepIndicatorText}>
-                        Step {currentStep} of {steps.length} • <Text style={{ fontWeight: 'bold' }}>{steps[currentStep - 1].title}</Text>
-                    </Text>
+                    {!readOnly ? (
+                        <Text style={styles.stepIndicatorText}>
+                            Step {currentStep} of {steps.length} • <Text style={{ fontWeight: 'bold' }}>{steps[currentStep - 1].title}</Text>
+                        </Text>
+                    ) : (
+                        <View />
+                    )}
 
                     {/* Right: Buttons */}
                     <View style={styles.footerButtonRow}>
@@ -367,27 +439,31 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
                             style={[styles.footerButton, styles.cancelButton]}
                             onPress={onClose}
                         >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                            <Text style={styles.cancelButtonText}>{readOnly ? 'Close' : 'Cancel'}</Text>
                         </TouchableOpacity>
 
-                        {currentStep < steps.length ? (
-                            <TouchableOpacity style={[styles.footerButton, styles.nextButton]} onPress={nextStep}>
-                                <Text style={styles.nextButtonText}>Next</Text>
-                                <MaterialCommunityIcons name="arrow-right" size={16} color="white" />
-                            </TouchableOpacity>
-                        ) : (
-                            <TouchableOpacity
-                                style={[styles.footerButton, styles.saveButton]}
-                                onPress={handleSave}
-                                disabled={loading}
-                            >
-                                {loading ? <ActivityIndicator color="white" /> : (
-                                    <>
-                                        <Text style={styles.saveButtonText}>{client ? 'Update' : 'Finish'}</Text>
-                                        <MaterialCommunityIcons name="check" size={16} color="white" style={{ marginLeft: 6 }} />
-                                    </>
+                        {!readOnly && (
+                            <>
+                                {currentStep < steps.length ? (
+                                    <TouchableOpacity style={[styles.footerButton, styles.nextButton]} onPress={nextStep}>
+                                        <Text style={styles.nextButtonText}>Next</Text>
+                                        <MaterialCommunityIcons name="arrow-right" size={16} color="white" />
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={[styles.footerButton, styles.saveButton]}
+                                        onPress={handleSave}
+                                        disabled={loading}
+                                    >
+                                        {loading ? <ActivityIndicator color="white" /> : (
+                                            <>
+                                                <Text style={styles.saveButtonText}>{client ? 'Update' : 'Finish'}</Text>
+                                                <MaterialCommunityIcons name="check" size={16} color="white" style={{ marginLeft: 6 }} />
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
                                 )}
-                            </TouchableOpacity>
+                            </>
                         )}
                     </View>
                 </View>
@@ -399,14 +475,17 @@ const ClientFormModal = ({ visible, onClose, onSave, client = null }) => {
 const styles = StyleSheet.create({
     mainContainer: { height: 600 },
     progressContainer: {
-        paddingVertical: 12,
+        paddingVertical: 8,
         backgroundColor: '#f8fafc',
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9',
     },
     stepperScroll: {
+        flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 24,
+        justifyContent: 'space-between',
+        paddingHorizontal: 32,
+        width: '100%',
     },
     pillStep: {
         flexDirection: 'row',
@@ -432,10 +511,10 @@ const styles = StyleSheet.create({
         marginLeft: 6,
     },
     stepperLine: {
-        width: 15,
+        flex: 1,
         height: 1,
         backgroundColor: '#cbd5e1',
-        marginHorizontal: 4,
+        marginHorizontal: 12,
     },
     modalSubtitle: {
         fontSize: 13,
@@ -458,6 +537,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#1e293b',
         ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+    },
+    readOnlyInput: {
+        backgroundColor: '#f8fafc',
+        color: '#64748b',
     },
     textArea: { height: 80, textAlignVertical: 'top' },
     row: { flexDirection: 'row' },
@@ -599,6 +682,89 @@ const styles = StyleSheet.create({
     autoGenBannerText: {
         fontSize: 13,
         color: '#0369a1',
+        fontWeight: '500',
+    },
+    // Summary Styles
+    detailSection: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    sectionHeaderCompact: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        gap: 8,
+    },
+    sectionTitleCompact: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1e293b',
+        textTransform: 'uppercase',
+    },
+    detailsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 16,
+    },
+    detailItem: {
+        flex: 1,
+        minWidth: '45%',
+    },
+    detailLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#94a3b8',
+        marginBottom: 4,
+    },
+    detailValue: {
+        fontSize: 14,
+        color: '#334155',
+        fontWeight: '600',
+    },
+    limitsGridFlat: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    limitCardFlat: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+        padding: 16,
+        borderRadius: 10,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    limitValFlat: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#6c7ae0',
+        marginBottom: 4,
+    },
+    limitLabFlat: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#64748b',
+    },
+    moduleGridSimple: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    moduleTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f1f5f9',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 6,
+        gap: 6,
+    },
+    moduleTagText: {
+        fontSize: 12,
+        color: '#475569',
         fontWeight: '500',
     },
 });

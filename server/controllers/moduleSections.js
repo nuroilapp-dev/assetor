@@ -39,16 +39,19 @@ exports.createModuleSection = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Module ID and name are required' });
     }
 
+    // Default to company 1 if context is missing (common for Super Admins)
+    const activeCompanyId = companyId || 1;
+
     try {
         const [rows] = await db.execute(
             'INSERT INTO module_sections (company_id, module_id, name, sort_order) VALUES (?, ?, ?, ?) RETURNING id',
-            [companyId, module_id, name, sort_order || 0]
+            [activeCompanyId, module_id, name, sort_order || 0]
         );
 
         res.status(201).json({
             success: true,
             message: 'Module section created successfully',
-            data: { id: rows[0].id }
+            data: { id: rows.insertId }
         });
     } catch (error) {
         console.error('[CreateModuleSection] Error:', error.message);

@@ -31,7 +31,7 @@ exports.getTemplates = async (req, res) => {
             WHERE t.company_id = ? AND t.is_active = 1
             ORDER BY t.created_at DESC
         `;
-        const [rows] = await db.execute(query, [req.user?.company_id]);
+        const [rows] = await db.execute(query, [req.user?.company_id || 0]);
         res.json({ success: true, data: rows });
     } catch (error) {
         console.error('getTemplates error:', error);
@@ -44,7 +44,7 @@ exports.getTemplateDetail = async (req, res) => {
     try {
         const [templates] = await db.execute(
             'SELECT * FROM module_templates WHERE id = ? AND company_id = ?',
-            [id, req.user.company_id]
+            [id, req.user?.company_id || 0]
         );
         if (templates.length === 0) return res.status(404).json({ success: false, message: 'Template not found' });
         const template = templates[0];
@@ -100,9 +100,9 @@ exports.createTemplate = async (req, res) => {
         // 1. Create Template
         const [tRows] = await connection.execute(
             'INSERT INTO module_templates (company_id, module_id, template_name) VALUES (?, ?, ?) RETURNING id',
-            [req.user.company_id, module_id, template_name || '']
+            [req.user?.company_id || 0, module_id, template_name || '']
         );
-        const templateId = tRows[0].id;
+        const templateId = tRows.insertId;
 
         // 2. Process Heads
         let hOrder = 1;
@@ -115,7 +115,7 @@ exports.createTemplate = async (req, res) => {
                 'INSERT INTO module_heads (template_id, head_title, head_order) VALUES (?, ?, ?) RETURNING id',
                 [templateId, head.head_title, head.head_order || hOrder++]
             );
-            const headId = hRows[0].id;
+            const headId = hRows.insertId;
 
             // 3. Process Subheads
             let sOrder = 1;
@@ -131,7 +131,7 @@ exports.createTemplate = async (req, res) => {
                         sub.subhead_order || sOrder++
                     ]
                 );
-                const subheadId = sRows[0].id;
+                const subheadId = sRows.insertId;
 
                 // 4. Process Options
                 if (['SELECT', 'RADIO', 'CHECKBOX'].includes(sub.field_type)) {
@@ -162,7 +162,7 @@ exports.createTemplate = async (req, res) => {
 
 exports.createConfiguration = async (req, res) => {
     const { module_id, template_name, description, use_template_sections } = req.body;
-    const company_id = req.user.company_id;
+    const company_id = req.user?.company_id || 0;
 
     if (!module_id) return res.status(400).json({ success: false, message: 'Module is required' });
     if (!template_name || template_name.trim().length < 3) return res.status(400).json({ success: false, message: 'Template Name must be at least 3 characters' });
@@ -176,7 +176,7 @@ exports.createConfiguration = async (req, res) => {
             'INSERT INTO module_templates (company_id, module_id, template_name, description) VALUES (?, ?, ?, ?) RETURNING id',
             [company_id, module_id, template_name.trim(), description || '']
         );
-        const templateId = tRows[0].id;
+        const templateId = tRows.insertId;
 
         // 2. Add Default Sections if requested
         if (use_template_sections) {
@@ -184,7 +184,7 @@ exports.createConfiguration = async (req, res) => {
                 'INSERT INTO module_heads (template_id, head_title, head_order) VALUES (?, ?, ?) RETURNING id',
                 [templateId, 'Basic Information', 1]
             );
-            const headId = hRows[0].id;
+            const headId = hRows.insertId;
 
             await connection.execute(
                 'INSERT INTO module_subheads (head_id, subhead_title, field_type, subhead_order) VALUES (?, ?, ?, ?)',
@@ -222,7 +222,7 @@ exports.updateTemplate = async (req, res) => {
         // Check ownership
         const [check] = await connection.execute(
             'SELECT id FROM module_templates WHERE id = ? AND company_id = ?',
-            [id, req.user.company_id]
+            [id, req.user?.company_id || 0]
         );
         if (check.length === 0) throw new Error('Template not found');
 
@@ -242,7 +242,7 @@ exports.updateTemplate = async (req, res) => {
                 'INSERT INTO module_heads (template_id, head_title, head_order) VALUES (?, ?, ?) RETURNING id',
                 [id, head.head_title, head.head_order || hOrder++]
             );
-            const headId = hRows[0].id;
+            const headId = hRows.insertId;
 
             let sOrder = 1;
             for (const sub of head.subheads) {
@@ -257,7 +257,7 @@ exports.updateTemplate = async (req, res) => {
                         sub.subhead_order || sOrder++
                     ]
                 );
-                const subheadId = sRows[0].id;
+                const subheadId = sRows.insertId;
 
                 if (['SELECT', 'RADIO', 'CHECKBOX'].includes(sub.field_type)) {
                     if (!sub.options || sub.options.length === 0) {
@@ -293,7 +293,7 @@ exports.deleteTemplate = async (req, res) => {
 
         const [check] = await connection.execute(
             'SELECT id FROM module_templates WHERE id = ? AND company_id = ?',
-            [id, req.user.company_id]
+            [id, req.user?.company_id || 0]
         );
         if (check.length === 0) {
             connection.rollback();
